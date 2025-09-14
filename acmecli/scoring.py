@@ -1,10 +1,18 @@
 from __future__ import annotations
-from typing import Dict
-from .metrics.repo_scan import (
-    size_score, license_score, rampup_score, bus_factor_score,
-    dataset_and_code_score, dataset_quality_score, code_quality_score, perf_claims_score
-)
+
 import time
+from typing import Dict
+
+from .metrics.repo_scan import (
+    bus_factor_score,
+    code_quality_score,
+    dataset_and_code_score,
+    dataset_quality_score,
+    license_score,
+    perf_claims_score,
+    rampup_score,
+    size_score,
+)
 
 DEFAULT_WEIGHTS: Dict[str, float] = {
     "size": 0.05,
@@ -17,8 +25,10 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
     "performance_claims": 0.10,
 }
 
+
 def clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
+
 
 def compute_all_scores(ctx: Dict) -> Dict:
     # repo-scan metrics
@@ -29,7 +39,10 @@ def compute_all_scores(ctx: Dict) -> Dict:
                                  d.get("tutorials", 0), d.get("api_docs", 0),
                                  d.get("reproducibility", 0))
     bus, bus_ms = bus_factor_score(ctx.get("contributors", 0))
-    dac, dac_ms = dataset_and_code_score(ctx.get("dataset_present", False), ctx.get("code_present", False))
+    dac, dac_ms = dataset_and_code_score(
+        ctx.get(
+            "dataset_present", False), ctx.get(
+            "code_present", False))
     dd = ctx.get("dataset_doc", {})
     dq, dq_ms = dataset_quality_score(dd.get("source", 0), dd.get("license", 0),
                                       dd.get("splits", 0), dd.get("ethics", 0))
@@ -58,7 +71,8 @@ def compute_all_scores(ctx: Dict) -> Dict:
         "code_quality_latency": cq_ms,
         "performance_claims_latency": pc_ms,
     }
-    # size object (same score for all devices for now — replace later if you want device-specific thresholds)
+    # size object (same score for all devices for now — replace later if you
+    # want device-specific thresholds)
     size_obj = {
         "raspberry_pi": scores["size"],
         "jetson_nano": scores["size"],

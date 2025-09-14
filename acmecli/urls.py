@@ -1,9 +1,11 @@
 from enum import Enum
 
+
 class Category(str, Enum):
     MODEL = "MODEL"
     DATASET = "DATASET"
     CODE = "CODE"
+
 
 def classify(url: str) -> Category:
     u = url.lower()

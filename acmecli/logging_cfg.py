@@ -1,4 +1,6 @@
-import logging, os
+import logging
+import os
+
 
 def setup_logging() -> None:
     # 0 = silent, 1 = info, 2 = debug (default silent)

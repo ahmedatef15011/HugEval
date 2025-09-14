@@ -1,10 +1,15 @@
 from __future__ import annotations
-from typing import Protocol, Tuple, Callable
+
 import time
+from typing import Callable, Protocol, Tuple
+
 
 class Metric(Protocol):
     name: str
-    def compute(self, ctx: dict) -> Tuple[float, int]: ...
+
+    def compute(self, ctx: dict) -> Tuple[float, int]:
+        ...
+
 
 def timed(fn: Callable[..., float]) -> Callable[..., Tuple[float, int]]:
     def wrapper(*args, **kwargs):
