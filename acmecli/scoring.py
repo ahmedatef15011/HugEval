@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Dict
+from typing import Dict, Any
 
 from .metrics.repo_scan import (
     bus_factor_score,
@@ -30,7 +30,7 @@ def clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
 
 
-def compute_all_scores(ctx: Dict) -> Dict:
+def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
     # repo-scan metrics
     size, size_ms = size_score(ctx.get("total_bytes", 0))
     lic, lic_ms = license_score(ctx.get("license_text", ""))
