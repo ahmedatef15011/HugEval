@@ -4,7 +4,7 @@ set -euo pipefail
 cmd="${1:-}"
 case "$cmd" in
   install)
-    pip install -e .[dev]
+    pip install -e '.[dev]'
     echo "Install complete."
     ;;
   test)
