@@ -1,15 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- pick a Python ---
+if command -v python3 >/dev/null 2>&1; then
+  PY=python3
+elif command -v python >/dev/null 2>&1; then
+  PY=python
+else
+  echo "Error: Python not found (looked for python3, then python)." >&2
+  exit 1
+fi
+
+# --- pick a pip compatible with that Python ---
+if "$PY" -m pip --version >/dev/null 2>&1; then
+  # Use pip module from the chosen Python (best practice)
+  PIP_CMD=("$PY" -m pip)
+elif command -v pip >/dev/null 2>&1; then
+  PIP_CMD=(pip)
+elif command -v pip3 >/dev/null 2>&1; then
+  PIP_CMD=(pip3)
+else
+  echo "Error: pip not found for $PY (tried '$PY -m pip', then pip, then pip3)." >&2
+  exit 1
+fi
+
 cmd="${1:-}"
 case "$cmd" in
   install)
-    pip install -e '.[dev]'
+    "${PIP_CMD[@]}" install -e '.[dev]'
     echo "Install complete."
     ;;
   test)
-    python - <<'PY'
-import sys, subprocess, json, re, os, tempfile, pathlib
+    "$PY" - <<'PY'
+import sys, subprocess, json, re
 # 1) Run pytest (shows pass/fail)
 res = subprocess.run([sys.executable, "-m", "pytest", "-q"], text=True)
 # 2) Run coverage
@@ -24,7 +47,7 @@ try:
         pct = f"{pct_val:.0f}%"
 except Exception:
     pass
-# 4) Count tests (pass/fail) from last pytest run by re-running quietly for a clean line
+# 4) Count tests (pass/fail) from a quiet re-run
 out = subprocess.run([sys.executable, "-m", "pytest", "-q"], capture_output=True, text=True).stdout
 passed = 0; total = 0
 m_pass = re.search(r"(\d+)\s+passed", out)
@@ -37,6 +60,6 @@ sys.exit(0 if res.returncode == 0 else 1)
 PY
     ;;
   *)
-    python -m acmecli.main "$@"
+    "$PY" -m acmecli.main "$@"
     ;;
 esac
