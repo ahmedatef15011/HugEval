@@ -1,166 +1,180 @@
+-----
+
 # ACME Model Scoring CLI
 
 ## Overview
-This tool is a **CLI program** that evaluates pre-trained Hugging Face models according to Sarah’s requirements.  
+
+This tool is a **CLI program** that evaluates pre-trained Hugging Face models according to Sarah’s requirements.
 It reads a list of URLs, computes multiple metrics, and outputs results as **NDJSON lines** for each MODEL URL.
 
-The CLI is implemented in **Python 3.11+** with strict code quality enforced by `flake8`, `isort`, and `mypy`.  
+The CLI is implemented in **Python 3.11+** with strict code quality enforced by `flake8`, `isort`, and `mypy`.
 Tests are written in `pytest`, with coverage measured via `coverage`.
 
----
+-----
 
 ## CLI Commands
 
 ### Install
+
+Installs all required dependencies (runtime + dev tools).
+
 ```bash
 ./run install
 ```
-Installs all required dependencies (runtime + dev tools).
 
 ### Score Models
+
+  - Reads a newline-delimited file of URLs.
+  - Filters for MODEL URLs (Hugging Face).
+  - For each model, prints **one NDJSON line** with all metrics and latencies.
+
+<!-- end list -->
+
 ```bash
 ./run urls.txt
 ```
-- Reads a newline-delimited file of URLs.
-- Filters for MODEL URLs (Hugging Face).
-- For each model, prints **one NDJSON line** with all metrics and latencies.
 
 **Example output:**
+
 ```json
 {"name":"https://huggingface.co/gpt2","category":"MODEL","net_score":0.90,...}
 ```
 
 ### Run Tests
+
+Runs tests and coverage. The command always prints a summary line like the following:
+
 ```bash
 ./run test
 ```
-Runs tests and coverage. Always prints:
+
 ```
 X/Y test cases passed. Z% line coverage achieved.
 ```
 
----
+-----
 
 ## Project Structure
 
-```
+```text
 acmecli/
-  __init__.py
-  main.py              # CLI entrypoint
-  logging_cfg.py       # sets up logging via $LOG_FILE, $LOG_LEVEL
-  io_utils.py          # read/write URLs + NDJSON
-  urls.py              # URL classifier (MODEL/DATASET/CODE)
-  scoring.py           # combines metrics into output dict
-  metrics/
-    base.py            # Metric protocol + timing decorator
-    repo_scan.py       # Metrics from repo/dataset inspection
-    hf_api.py          # Metrics from Hugging Face API (stub for now)
+├── __init__.py
+├── main.py         # CLI entrypoint
+├── logging_cfg.py  # sets up logging via $LOG_FILE, $LOG_LEVEL
+├── io_utils.py     # read/write URLs + NDJSON
+├── urls.py         # URL classifier (MODEL/DATASET/CODE)
+├── scoring.py      # combines metrics into output dict
+└── metrics/
+    ├── base.py         # Metric protocol + timing decorator
+    ├── repo_scan.py    # Metrics from repo/dataset inspection
+    └── hf_api.py       # Metrics from Hugging Face API (stub for now)
 tests/
-  test_smoke.py        # starter unit tests
-run                    # CLI shim (install, test, scoring)
-pyproject.toml         # deps + lint/test/type configs
+└── test_smoke.py   # starter unit tests
+run                 # CLI shim (install, test, scoring)
+pyproject.toml      # deps + lint/test/type configs
 ```
 
----
+-----
 
 ## Metrics
 
-Each metric is implemented as a function that returns `(score ∈ [0,1], latency_ms)`.
+Each metric is implemented as a function that returns a tuple: `(score ∈ [0,1], latency_ms)`.
 
-| Metric              | Formula / Rule                                                                 | Source             |
-|---------------------|---------------------------------------------------------------------------------|--------------------|
-| **Size**            | Linear decay: `(U - S) / (U - L)`, clipped to [0,1]                            | Repo scan          |
-| **License**         | 1.0 if LGPL-2.1 compatible, 0.5 if unclear, 0.0 if incompatible                | Repo scan          |
-| **Ramp Up Time**    | Average of 5 flags (README, Quickstart, Tutorials, API docs, Reproducibility)  | Repo scan          |
-| **Bus Factor**      | Contributors / (Contributors + k), k=5                                         | Repo scan/API      |
-| **Dataset & Code**  | (DatasetFlag + CodeFlag) / 2                                                    | Repo scan          |
-| **Dataset Quality** | (Source + License + Splits + Ethics) / 4                                       | Repo scan          |
-| **Code Quality**    | 0.4·Flake8 + 0.2·Isort + 0.4·Mypy                                              | Linting tools      |
-| **Perf. Claims**    | (Benchmarks + Citations) / 2                                                   | Repo/API           |
+| Metric              | Formula / Rule                                                                    | Source               |
+| ------------------- | --------------------------------------------------------------------------------- | -------------------- |
+| **Size** | Linear decay: `(U - S) / (U - L)`, clipped to `[0,1]`                              | Repo scan            |
+| **License** | `1.0` if LGPL-2.1 compatible, `0.5` if unclear, `0.0` if incompatible               | Repo scan            |
+| **Ramp Up Time** | Average of 5 flags (README, Quickstart, Tutorials, API docs, Reproducibility)     | Repo scan            |
+| **Bus Factor** | `Contributors / (Contributors + k)`, where k=5                                    | Repo scan/API        |
+| **Dataset & Code** | `(DatasetFlag + CodeFlag) / 2`                                                    | Repo scan            |
+| **Dataset Quality** | `(Source + License + Splits + Ethics) / 4`                                        | Repo scan            |
+| **Code Quality** | `0.4*Flake8 + 0.2*Isort + 0.4*Mypy`                                                 | Linting tools        |
+| **Perf. Claims** | `(Benchmarks + Citations) / 2`                                                    | Repo/API             |
 
 ### NetScore
-Weighted sum of all metrics:
+
+The NetScore is a weighted sum of all metrics:
+
 ```
 NetScore = 0.20*License + 0.20*DatasetAndCode + 0.15*CodeQuality
          + 0.15*RampUp + 0.10*BusFactor + 0.10*PerformanceClaims
          + 0.05*DatasetQuality + 0.05*Size
 ```
 
----
+-----
 
 ## How It Works
 
-1. **URL File Parsing**  
-   Reads `urls.txt`, filters for Hugging Face MODEL URLs.
+1.  **URL File Parsing** The CLI reads the input `urls.txt` file and filters for valid Hugging Face MODEL URLs.
 
-2. **Context Builder (`build_ctx_from_url`)**  
-   - Milestone 2: returns **placeholder values**.  
-   - Milestone 3: will query Hugging Face API + scan repos.  
+2.  **Context Builder (`build_ctx_from_url`)**
 
-3. **Metric Computation**  
-   Each metric is decorated with `@timed`, so we record its runtime latency.
+      - Milestone 2: This function returns **placeholder values**.
+      - Milestone 3: This will be implemented to query the Hugging Face API and scan git repositories.
 
-4. **Scoring & Output**  
-   `compute_all_scores()` gathers metric results, builds the NDJSON object, and computes NetScore.
+3.  **Metric Computation** Each metric function is decorated with `@timed`, which records its runtime latency.
 
-5. **Parallel Execution**  
-   Models are processed in parallel using `ProcessPoolExecutor`.
+4.  **Scoring & Output** `compute_all_scores()` gathers all metric results, computes the final `NetScore`, and builds the NDJSON object for output.
 
----
+5.  **Parallel Execution** Models are processed in parallel using a `ProcessPoolExecutor` to improve performance.
+
+-----
 
 ## Testing
 
-- Tests are located in `tests/`.
-- Run with:
-  ```bash
-  ./run test
-  ```
-- Current tests: basic smoke tests for all metrics.
-- Coverage target: **≥80%** before final delivery.
-- Plan: expand with more unit + integration tests in Milestone 3.
+  - Tests are located in the `tests/` directory.
+  - Run the full suite with:
+    ```bash
+    ./run test
+    ```
+  - **Current Status**: The suite contains basic smoke tests for all metric calculations.
+  - **Coverage Target**: We aim for **≥80%** line coverage before final delivery.
+  - **Plan**: Expand the suite with more comprehensive unit and integration tests in Milestone 3.
 
----
+-----
 
 ## Development Guidelines
 
-- **Code Style**  
-  - Pass `flake8`, `isort`, `mypy`.  
-  - Type annotations required.  
+  - **Code Style**
 
-- **Testing**  
-  - Every function should have at least one test.  
-  - Another teammate should add an extra test for each module.  
+      - All code must pass `flake8`, `isort`, and `mypy` checks.
+      - Type annotations are required for all functions.
 
-- **Error Handling**  
-  - On fatal error, program exits with code **1**.  
-  - Always print a clear error message to stderr.  
-  - Logs go to `$LOG_FILE` at verbosity `$LOG_LEVEL`.  
+  - **Testing**
 
-- **Pull Requests**  
-  - Must pass CI before merging.  
-  - Require peer review.  
+      - Every new function should have at least one corresponding test.
+      - Each module should have at least one additional test written by another teammate.
 
----
+  - **Error Handling**
+
+      - On a fatal error, the program must exit with status code **1**.
+      - All errors should be printed clearly to `stderr`.
+      - Detailed logs are written to `$LOG_FILE` at a verbosity level set by `$LOG_LEVEL`.
+
+  - **Pull Requests**
+
+      - Must pass all Continuous Integration (CI) checks before merging.
+      - Require at least one peer review.
+
+-----
 
 ## Next Steps
 
-- Replace placeholder `build_ctx_from_url()` with **real Hugging Face API** calls and **repo scanning**.  
-- Expand the test suite to 20+ cases.  
-- Achieve ≥80% coverage.  
-- Add UML diagrams to documentation.  
+  - Replace the placeholder `build_ctx_from_url()` with **real Hugging Face API** calls and **repository scanning** logic.
+  - Expand the test suite to cover more edge cases (goal: 20+ total test cases).
+  - Achieve the project goal of ≥80% test coverage.
+  - Add UML diagrams to the documentation to visualize the architecture.
 
----
+-----
 
 ## Summary
 
 You now have a working **CLI skeleton** that:
-- Outputs NDJSON lines per MODEL URL  
-- Implements Sarah’s metrics + NetScore  
-- Runs in parallel  
-- Supports install/test commands  
-- Already passes initial smoke tests  
 
-This is the foundation for **Milestone 2**.  
-**Milestone 3** will make the metrics real by pulling data from Hugging Face and repo scans.
+  - Outputs NDJSON lines per MODEL URL.
+  - Implements all of Sarah’s required metrics and the final `NetScore`.
+  - Runs its scoring logic in parallel.
+  - Supports simple `install` and `test` commands.
+  - Passes all initial smoke tests.
 
----
+This serves as the foundation for **Milestone 2**. The focus for **Milestone 3** will be to make the metrics real by pulling live data from Hugging Face and cloned repositories.
