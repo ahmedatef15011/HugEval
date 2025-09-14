@@ -6,8 +6,9 @@ from .base import timed
 
 
 @timed
-def popularity_downloads_likes(downloads: int, likes: int,
-                               d_cap: int = 100_000, l_cap: int = 1_000) -> float:
+def popularity_downloads_likes(
+    downloads: int, likes: int, d_cap: int = 100_000, l_cap: int = 1_000
+) -> float:
     """Log-scaled normalization for popularity."""
     d_norm = min(1.0, math.log1p(max(0, downloads)) / math.log1p(d_cap))
     likes_norm = min(1.0, math.log1p(max(0, likes)) / math.log1p(l_cap))

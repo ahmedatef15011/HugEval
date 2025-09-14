@@ -6,10 +6,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with:
+          python-version: "3.11"
       - run: pip install -e .[dev]
+      # Gates in same order as `make check`
+      - run: python -m black . --line-length 100 --check
+      - run: python -m isort . --profile black --line-length 100 --check-only
       - run: flake8
-      - run: isort --check-only .
       - run: mypy acmecli
       - run: coverage run -m pytest -q
       - run: coverage report -m

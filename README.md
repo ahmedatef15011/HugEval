@@ -1,10 +1,10 @@
 # ACME Model Scoring CLI
 
 ## Overview
-This tool is a **CLI program** that evaluates pre-trained Hugging Face models according to Sarah's requirements.  
+This tool is a **CLI program** that evaluates pre-trained Hugging Face models according to Sarah's requirements.
 It reads a list of URLs, computes multiple metrics, and outputs results as **NDJSON lines** for each MODEL URL.
 
-The CLI is implemented in **Python 3.11+** with strict code quality enforced by `flake8`, `isort`, and `mypy`.  
+The CLI is implemented in **Python 3.11+** with strict code quality enforced by `flake8`, `isort`, and `mypy`.
 Tests are written in `pytest`, with coverage measured via `coverage`.
 
 ---
@@ -89,20 +89,20 @@ NetScore = 0.20*License + 0.20*DatasetAndCode + 0.15*CodeQuality
 
 ## How It Works
 
-1. **URL File Parsing**  
+1. **URL File Parsing**
    Reads `urls.txt`, filters for Hugging Face MODEL URLs.
 
-2. **Context Builder (`build_ctx_from_url`)**  
+2. **Context Builder (`build_ctx_from_url`)**
    - Milestone 2: returns **placeholder values**
    - Milestone 3: will query Hugging Face API + scan repos
 
-3. **Metric Computation**  
+3. **Metric Computation**
    Each metric is decorated with `@timed`, so we record its runtime latency.
 
-4. **Scoring & Output**  
+4. **Scoring & Output**
    `compute_all_scores()` gathers metric results, builds the NDJSON object, and computes NetScore.
 
-5. **Parallel Execution**  
+5. **Parallel Execution**
    Models are processed in parallel using `ProcessPoolExecutor`.
 
 ---
@@ -159,5 +159,5 @@ You now have a working **CLI skeleton** that:
 - Supports install/test commands
 - Already passes initial smoke tests
 
-This is the foundation for **Milestone 2**.  
+This is the foundation for **Milestone 2**.
 **Milestone 3** will make the metrics real by pulling data from Hugging Face and repo scans.

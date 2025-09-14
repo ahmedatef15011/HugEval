@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Dict, Any
+from typing import Any, Dict
 
 from .metrics.repo_scan import (
     bus_factor_score,
@@ -35,19 +35,24 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
     size, size_ms = size_score(ctx.get("total_bytes", 0))
     lic, lic_ms = license_score(ctx.get("license_text", ""))
     d = ctx.get("docs", {})
-    ramp, ramp_ms = rampup_score(d.get("readme", 0), d.get("quickstart", 0),
-                                 d.get("tutorials", 0), d.get("api_docs", 0),
-                                 d.get("reproducibility", 0))
+    ramp, ramp_ms = rampup_score(
+        d.get("readme", 0),
+        d.get("quickstart", 0),
+        d.get("tutorials", 0),
+        d.get("api_docs", 0),
+        d.get("reproducibility", 0),
+    )
     bus, bus_ms = bus_factor_score(ctx.get("contributors", 0))
     dac, dac_ms = dataset_and_code_score(
-        ctx.get(
-            "dataset_present", False), ctx.get(
-            "code_present", False))
+        ctx.get("dataset_present", False), ctx.get("code_present", False)
+    )
     dd = ctx.get("dataset_doc", {})
-    dq, dq_ms = dataset_quality_score(dd.get("source", 0), dd.get("license", 0),
-                                      dd.get("splits", 0), dd.get("ethics", 0))
-    cq, cq_ms = code_quality_score(ctx.get("flake8_errors", 0), ctx.get("isort_sorted", True),
-                                   ctx.get("mypy_errors", 0))
+    dq, dq_ms = dataset_quality_score(
+        dd.get("source", 0), dd.get("license", 0), dd.get("splits", 0), dd.get("ethics", 0)
+    )
+    cq, cq_ms = code_quality_score(
+        ctx.get("flake8_errors", 0), ctx.get("isort_sorted", True), ctx.get("mypy_errors", 0)
+    )
     p = ctx.get("perf", {})
     pc, pc_ms = perf_claims_score(p.get("benchmarks", False), p.get("citations", False))
 
