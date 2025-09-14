@@ -1,8 +1,15 @@
+# Python environments & caches
 .venv/
 __pycache__/
 .pytest_cache/
+
+# Coverage & test artifacts
 .coverage
-dist/
-*.log
-*.egg-info/
 coverage.json
+
+# Build & distribution
+dist/
+*.egg-info/
+
+# Logs
+*.log
