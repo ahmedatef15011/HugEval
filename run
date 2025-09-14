@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cmd="${1:-}"
+case "$cmd" in
+  install)
+    pip install -e .[dev]
+    echo "Install complete."
+    ;;
+  test)
+    python - <<'PY'
+import sys, subprocess, json, re, os, tempfile, pathlib
+# 1) Run pytest (shows pass/fail)
+res = subprocess.run([sys.executable, "-m", "pytest", "-q"], text=True)
+# 2) Run coverage
+subprocess.run([sys.executable, "-m", "coverage", "run", "-m", "pytest", "-q"], check=False)
+# 3) Get JSON totals
+subprocess.run([sys.executable, "-m", "coverage", "json", "-o", "coverage.json"], check=False)
+pct = "0%"
+try:
+    with open("coverage.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+        pct_val = data.get("totals", {}).get("percent_covered", 0.0)
+        pct = f"{pct_val:.0f}%"
+except Exception:
+    pass
+# 4) Count tests (pass/fail) from last pytest run by re-running quietly for a clean line
+out = subprocess.run([sys.executable, "-m", "pytest", "-q"], capture_output=True, text=True).stdout
+passed = 0; total = 0
+m_pass = re.search(r"(\d+)\s+passed", out)
+if m_pass: passed = int(m_pass.group(1))
+m_all = re.findall(r"(\d+)\s+(?:passed|failed|skipped|xpassed|xfailed|errors?)", out)
+if m_all: total = sum(int(x) for x in m_all)
+if total == 0: total = passed
+print(f"{passed}/{total} test cases passed. {pct} line coverage achieved.")
+sys.exit(0 if res.returncode == 0 else 1)
+PY
+    ;;
+  *)
+    python -m acmecli.main "$@"
+    ;;
+esac
