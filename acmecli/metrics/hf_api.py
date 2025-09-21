@@ -26,6 +26,35 @@ def extract_model_id(url: str) -> str:
     raise ValueError(f"Invalid Hugging Face URL: {url}")
 
 
+def fetch_readme_content(model_id: str) -> str:
+    """Fetch README content from Hugging Face model repository."""
+    try:
+        # Try to fetch README.md
+        response = requests.get(
+            f"https://huggingface.co/{model_id}/raw/main/README.md",
+            timeout=10,
+            headers={"User-Agent": "ACME-CLI/0.1.0"},
+        )
+        if response.status_code == 200:
+            return response.text
+
+        # Try README without extension
+        response = requests.get(
+            f"https://huggingface.co/{model_id}/raw/main/README",
+            timeout=10,
+            headers={"User-Agent": "ACME-CLI/0.1.0"},
+        )
+        if response.status_code == 200:
+            return response.text
+
+        logger.info(f"No README found for {model_id}")
+        return ""
+
+    except requests.RequestException as e:
+        logger.warning(f"Failed to fetch README for {model_id}: {e}")
+        return ""
+
+
 def fetch_model_info(model_id: str) -> Dict[str, Any]:
     """Fetch model information from Hugging Face API."""
     try:
@@ -147,6 +176,9 @@ def build_context_from_api(url: str) -> Dict[str, Any]:
         license_text = get_model_license(model_info)
         days_since_update = get_days_since_update(model_info)
 
+        # Fetch README content for LLM analysis
+        readme_content = fetch_readme_content(model_id)
+
         # Build context with real data
         context = {
             "total_bytes": total_bytes,
@@ -156,7 +188,8 @@ def build_context_from_api(url: str) -> Dict[str, Any]:
             "days_since_update": days_since_update,
             # TODO: These would require additional API calls or repo scanning
             # For now, use reasonable defaults based on model popularity
-            "docs": estimate_docs_quality(model_info),
+            "docs": estimate_docs_quality(model_info, readme_content, model_id),
+            "readme_content": readme_content,  # Store for potential future use
             "contributors": estimate_contributors(model_info),
             "dataset_present": estimate_dataset_presence(model_info),
             "code_present": estimate_code_presence(model_info),
@@ -201,8 +234,13 @@ def get_fallback_context() -> Dict[str, Any]:
     }
 
 
-def estimate_docs_quality(model_info: Dict[str, Any]) -> Dict[str, float]:
-    """Estimate documentation quality based on available info."""
+def estimate_docs_quality(
+    model_info: Dict[str, Any], readme_content: str = "", model_id: str = ""
+) -> Dict[str, float]:
+    """Estimate documentation quality based on available info and LLM analysis."""
+    # Import LLM analysis here to avoid circular imports
+    from ..llm_analysis import analyze_readme_with_llm
+
     # Higher quality for models with more downloads/likes
     downloads = model_info.get("downloads", 0)
     likes = model_info.get("likes", 0)
@@ -210,13 +248,41 @@ def estimate_docs_quality(model_info: Dict[str, Any]) -> Dict[str, float]:
     # Popular models likely have better docs
     popularity_score = min(1.0, (downloads / 10000) * 0.3 + (likes / 100) * 0.7)
 
-    return {
+    # Base scores from popularity
+    base_scores = {
         "readme": min(1.0, 0.3 + popularity_score * 0.7),  # Most models have some README
         "quickstart": popularity_score * 0.8,
         "tutorials": popularity_score * 0.6,
         "api_docs": popularity_score * 0.7,
         "reproducibility": popularity_score * 0.5,
     }
+
+    # Enhance with LLM analysis if README content is available
+    if readme_content and model_id:
+        try:
+            llm_analysis = analyze_readme_with_llm(readme_content, model_id)
+
+            # Enhance README score with LLM insights
+            llm_readme_score = llm_analysis.get("documentation_quality", 0.0)
+            enhanced_readme = base_scores["readme"] * 0.6 + llm_readme_score * 0.4
+
+            # Enhance other scores based on LLM findings
+            if llm_analysis.get("installation_instructions", False):
+                base_scores["quickstart"] = min(1.0, base_scores["quickstart"] + 0.2)
+
+            if llm_analysis.get("usage_examples", False):
+                base_scores["tutorials"] = min(1.0, base_scores["tutorials"] + 0.3)
+
+            if llm_analysis.get("code_blocks_count", 0) >= 2:
+                base_scores["api_docs"] = min(1.0, base_scores["api_docs"] + 0.2)
+
+            base_scores["readme"] = enhanced_readme
+            logger.info(f"Enhanced documentation scores with LLM for {model_id}")
+
+        except Exception as e:
+            logger.warning(f"LLM enhancement failed for {model_id}: {e}")
+
+    return base_scores
 
 
 def estimate_contributors(model_info: Dict[str, Any]) -> int:
