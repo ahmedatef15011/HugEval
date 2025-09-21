@@ -177,7 +177,12 @@ def _call_openai_api(readme_content: str, model_name: str) -> Dict[str, Any]:
         # Parse and validate LLM response with error handling
         import json
 
-        result = json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+        if content is None:
+            logger.warning("OpenAI returned empty response, falling back to local analysis")
+            return _analyze_readme_locally(readme_content, model_name)
+
+        result: dict[str, Any] = json.loads(content)
 
         # Combine LLM insights with comprehensive local analysis for complete assessment
         result.update(_analyze_readme_locally(readme_content, model_name))
@@ -225,7 +230,7 @@ def enhance_ramp_up_time_with_llm(base_score: float, readme_content: str, model_
             + (1.0 if analysis["examples_present"] else 0.0) * 0.2
         )
 
-        enhanced_score = base_weight * base_score + llm_weight * llm_score
+        enhanced_score: float = base_weight * base_score + llm_weight * llm_score
 
         logger.info(
             f"Enhanced ramp_up_time for {model_name}: {base_score:.3f} -> {enhanced_score:.3f}"
