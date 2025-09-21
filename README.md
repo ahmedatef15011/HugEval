@@ -4,6 +4,12 @@
 This tool is a **CLI program** that evaluates pre-trained Hugging Face models according to Sarah's requirements.
 It reads a list of URLs, computes multiple metrics, and outputs results as **NDJSON lines** for each MODEL URL.
 
+**Key Features:**
+- Real-time Hugging Face API integration for accurate model data
+- NDJSON output format for machine processing
+- Human-readable summary reports with rankings and recommendations
+- Parallel processing with cross-platform compatibility
+
 The CLI is implemented in **Python 3.11+** with strict code quality enforced by `flake8`, `isort`, and `mypy`.
 Tests are written in `pytest`, with coverage measured via `coverage`.
 
@@ -28,6 +34,39 @@ Installs all required dependencies (runtime + dev tools).
 **Example output:**
 ```json
 {"name":"https://huggingface.co/gpt2","category":"MODEL","net_score":0.90,...}
+```
+
+### Score Models with Summary Report
+```bash
+./run urls.txt --summary
+```
+- Same as above, but also generates **human-readable summary files**.
+- Creates timestamped `.jsonl` and `_summary.txt` files.
+- Provides executive summary, rankings, and recommendations.
+
+**Custom output filename:**
+```bash
+./run urls.txt --summary --output my_analysis
+```
+
+**Example summary output:**
+```
+🤖 ACME MODEL EVALUATION SUMMARY REPORT
+========================================
+Generated: 2025-09-21 13:27:12
+Total Models Evaluated: 3
+
+📊 EXECUTIVE SUMMARY
+Average Quality Score: 65.2% (Good)
+
+🏆 TOP MODELS RANKING
+1. bert-base-uncased (Score: 72.1% - Good)
+2. gpt2 (Score: 60.7% - Good)
+3. distilbert-base-uncased (Score: 62.8% - Good)
+
+💡 RECOMMENDATIONS
+⚠️ No LGPL-2.1 compliant models found.
+🥧 2 models suitable for Raspberry Pi deployment.
 ```
 
 ### Run Tests

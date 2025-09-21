@@ -23,6 +23,10 @@ build/
 *.log
 acmecli.log
 
+# Summary report outputs (timestamped files)
+*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].jsonl
+*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9]_summary.txt
+
 # Editor / tool noise (safe to ignore even if not present)
 .idea/
 .vscode/
