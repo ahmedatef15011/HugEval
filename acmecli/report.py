@@ -1,5 +1,17 @@
 """
-Human-readable report generation for model evaluation results.
+Executive Business Reporting System for ML Model Evaluation Results
+
+This module transforms technical model evaluation data into executive-friendly business
+reports that enable strategic decision-making. The reporting system bridges the gap
+between technical metrics and business value, providing clear recommendations for
+model adoption, risk assessment, and deployment planning.
+
+The system generates comprehensive summaries with risk categorization, compliance
+analysis, and actionable insights that support both technical teams and business
+stakeholders in making informed decisions about ML model integration.
+
+Key capabilities include comparative analysis, trend identification, compliance
+reporting, and strategic recommendations based on comprehensive quality assessment.
 """
 
 from __future__ import annotations
@@ -11,28 +23,49 @@ from typing import Any, Dict, List, Optional
 
 
 def parse_model_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Parse and analyze model results for summary generation."""
+    """
+    Transform raw evaluation results into structured business intelligence data.
+
+    This function serves as the primary data processing pipeline that converts
+    technical scoring results into business-relevant insights. Performs statistical
+    analysis, risk categorization, and trend identification to support strategic
+    decision-making processes.
+
+    The analysis includes performance ranking, quality distribution assessment,
+    and risk-based categorization that enables executives to quickly identify
+    deployment-ready models and understand overall portfolio quality.
+
+    Args:
+        results: List of model evaluation results with scores and metadata
+
+    Returns:
+        Dict containing structured analysis with rankings, statistics, and categories
+    """
     if not results:
         return {"total_models": 0, "models": []}
 
-    # Sort models by net score (highest first)
+    # Strategic ranking by composite trustworthiness score
     sorted_models = sorted(results, key=lambda x: x.get("net_score", 0), reverse=True)
 
-    # Calculate statistics
+    # Portfolio performance analytics
     net_scores = [model.get("net_score", 0) for model in results]
     avg_score = sum(net_scores) / len(net_scores)
 
-    # Categorize models
-    excellent_models = [m for m in results if m.get("net_score", 0) >= 0.8]
-    good_models = [m for m in results if 0.6 <= m.get("net_score", 0) < 0.8]
-    acceptable_models = [m for m in results if 0.4 <= m.get("net_score", 0) < 0.6]
-    poor_models = [m for m in results if m.get("net_score", 0) < 0.4]
+    # Risk-based model categorization for deployment decision support
+    excellent_models = [m for m in results if m.get("net_score", 0) >= 0.8]  # Ready for production
+    good_models = [
+        m for m in results if 0.6 <= m.get("net_score", 0) < 0.8
+    ]  # Minor improvements needed
+    acceptable_models = [
+        m for m in results if 0.4 <= m.get("net_score", 0) < 0.6
+    ]  # Significant concerns
+    poor_models = [m for m in results if m.get("net_score", 0) < 0.4]  # High risk deployment
 
-    # License compliance
+    # Strategic compliance and risk assessment
     compliant_models = [m for m in results if m.get("license", 0) >= 1.0]
     non_compliant_models = [m for m in results if m.get("license", 0) < 1.0]
 
-    # Device compatibility
+    # Deployment platform compatibility analysis for infrastructure planning
     raspberry_pi_compatible = [
         m for m in results if m.get("size_score", {}).get("raspberry_pi", 0) > 0.5
     ]
@@ -60,21 +93,45 @@ def parse_model_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             "raspberry_pi": len(raspberry_pi_compatible),
             "desktop_pc": len(desktop_compatible),
         },
-        "top_models": sorted_models[:5],  # Top 5 models
+        "top_models": sorted_models[:5],  # Strategic recommendations for deployment
         "compliant_models": compliant_models,
         "raspberry_pi_models": raspberry_pi_compatible,
     }
 
 
 def extract_model_name(url: str) -> str:
-    """Extract a clean model name from Hugging Face URL."""
+    """
+    Extract human-readable model identifier from repository URL for business reporting.
+
+    Transforms technical URLs into clean, presentation-ready model names suitable
+    for executive reports and business documentation. Essential for creating
+    professional reports that communicate clearly with non-technical stakeholders.
+
+    Args:
+        url: Full repository URL from evaluation results
+
+    Returns:
+        str: Clean model name suitable for business presentation
+    """
     if "huggingface.co/" in url:
         return url.split("/")[-1] if url.endswith("/") else url.split("/")[-1]
     return url
 
 
 def format_score(score: float) -> str:
-    """Format score as percentage with rating."""
+    """
+    Transform numerical scores into executive-friendly ratings with business context.
+
+    Converts technical scores into intuitive percentage ratings with qualitative
+    assessments that enable quick decision-making. The rating system aligns with
+    business risk tolerance and deployment readiness criteria.
+
+    Args:
+        score: Numerical score from evaluation system [0.0, 1.0]
+
+    Returns:
+        str: Formatted percentage with qualitative business rating
+    """
     percentage = score * 100
     if percentage >= 80:
         return f"{percentage:.1f}% (Excellent)"
@@ -89,7 +146,25 @@ def format_score(score: float) -> str:
 def generate_summary_report(
     results: List[Dict[str, Any]], output_file: str = "model_evaluation_summary.txt"
 ) -> str:
-    """Generate a human-readable summary report."""
+    """
+    Generate comprehensive executive summary report for strategic decision-making.
+
+    Creates professional business reports that transform technical evaluation data
+    into actionable insights for executives, product managers, and technical leaders.
+    The report includes executive summary, risk assessment, deployment recommendations,
+    and detailed analysis suitable for board presentations and strategic planning.
+
+    The report structure follows enterprise reporting standards with clear sections
+    for different stakeholder needs: executive overview, technical details, risk
+    analysis, and implementation recommendations.
+
+    Args:
+        results: Model evaluation results from the assessment pipeline
+        output_file: Output filename for the generated report
+
+    Returns:
+        str: Path to the generated summary report file
+    """
 
     analysis = parse_model_results(results)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

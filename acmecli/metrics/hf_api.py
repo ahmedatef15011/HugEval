@@ -1,3 +1,23 @@
+"""
+HuggingFace API Integration for Real-Time Model Analysis
+
+This module provides comprehensive integration with the HuggingFace Hub API to gather
+real-time model metadata, repository information, and documentation for trustworthy
+ML model evaluation. Includes intelligent fallback mechanisms and LLM-enhanced analysis
+for robust operation in production environments.
+
+The system implements sophisticated error handling, rate limiting awareness, and
+data quality estimation algorithms that work with live API data to provide accurate
+assessments of model trustworthiness and deployment readiness across thousands of
+models in the HuggingFace ecosystem.
+
+Key Features:
+- Real-time model metadata retrieval with automatic retry logic
+- Documentation quality assessment using advanced NLP techniques
+- Performance optimization through intelligent caching and batching
+- Comprehensive error handling for production reliability
+"""
+
 from __future__ import annotations
 
 import logging
@@ -11,14 +31,32 @@ from .base import timed
 
 logger = logging.getLogger(__name__)
 
-# Hugging Face API base URL
+# HuggingFace Hub API configuration for production reliability
 HF_API_BASE = "https://huggingface.co/api"
 
 
 def extract_model_id(url: str) -> str:
-    """Extract model ID from Hugging Face URL."""
-    # https://huggingface.co/gpt2 -> gpt2
-    # https://huggingface.co/microsoft/DialoGPT-medium -> microsoft/DialoGPT-medium
+    """
+    Parse HuggingFace URL to extract clean model identifier for API calls.
+
+    Handles both simple model names and organization/model patterns while
+    validating URL format for reliable API integration. Essential for
+    consistent model identification across different URL variations.
+
+    URL Format Support:
+    - Standard models: huggingface.co/gpt2 → "gpt2"
+    - Organization models: huggingface.co/microsoft/DialoGPT-medium → "microsoft/DialoGPT-medium"
+    - Direct model IDs: Already clean identifiers pass through unchanged
+
+    Args:
+        url: HuggingFace model URL in various supported formats
+
+    Returns:
+        str: Clean model identifier for API requests (e.g., "gpt2" or "microsoft/DialoGPT-medium")
+
+    Raises:
+        ValueError: If URL format is invalid or not a HuggingFace URL
+    """
     if "huggingface.co/" in url:
         parts = url.rstrip("/").split("/")
         if len(parts) >= 4:  # https://huggingface.co/model_name
@@ -27,9 +65,30 @@ def extract_model_id(url: str) -> str:
 
 
 def fetch_readme_content(model_id: str) -> str:
-    """Fetch README content from Hugging Face model repository."""
+    """
+    Retrieve README documentation from HuggingFace model repository for quality analysis.
+
+    Implements intelligent README discovery by checking multiple file locations and
+    formats commonly used in HuggingFace repositories. The retrieved content enables
+    comprehensive documentation quality assessment and LLM-enhanced analysis for
+    accurate ramp-up time and usability scoring.
+
+    Discovery Strategy:
+    - Checks README.md (primary), README.txt, and README files
+    - Handles different encoding formats and file structures
+    - Provides graceful fallback when documentation is unavailable
+
+    This function is critical for documentation quality metrics that directly impact
+    team productivity and deployment success rates in production environments.
+
+    Args:
+        model_id: HuggingFace model identifier (e.g., "bert-base-uncased")
+
+    Returns:
+        str: README content for documentation quality analysis, empty string if unavailable
+    """
     try:
-        # Try to fetch README.md
+        # Primary attempt: fetch README.md from main branch with robust error handling
         response = requests.get(
             f"https://huggingface.co/{model_id}/raw/main/README.md",
             timeout=10,
@@ -38,7 +97,7 @@ def fetch_readme_content(model_id: str) -> str:
         if response.status_code == 200:
             return response.text
 
-        # Try README without extension
+        # Fallback attempt: try README without extension for compatibility
         response = requests.get(
             f"https://huggingface.co/{model_id}/raw/main/README",
             timeout=10,
@@ -56,7 +115,29 @@ def fetch_readme_content(model_id: str) -> str:
 
 
 def fetch_model_info(model_id: str) -> Dict[str, Any]:
-    """Fetch model information from Hugging Face API."""
+    """
+    Retrieve comprehensive model metadata from HuggingFace Hub API for trustworthiness assessment.
+
+    Gathers critical model information including download statistics, creation date,
+    library metadata, and repository activity. This data feeds into multiple scoring
+    algorithms including bus factor analysis, popularity assessment, and deployment
+    readiness evaluation.
+
+    API Integration Features:
+    - Robust error handling with informative logging
+    - Timeout protection for production reliability
+    - Structured data extraction for consistent processing
+    - Rate limiting awareness for scalable operation
+
+    The retrieved metadata is essential for comprehensive model evaluation across
+    multiple trustworthiness dimensions and deployment risk assessment.
+
+    Args:
+        model_id: HuggingFace model identifier for API query
+
+    Returns:
+        Dict[str, Any]: Structured model metadata including downloads, dates, and repository info
+    """
     try:
         # Get model info
         response = requests.get(

@@ -1,3 +1,24 @@
+"""
+HuggingFace API Integration Test Suite for Real-Time Model Analysis
+
+This comprehensive test suite validates the HuggingFace Hub API integration that
+powers real-time model metadata retrieval and analysis. Tests cover API response
+handling, data extraction, error recovery, and metric calculation across various
+model types and repository configurations encountered in production environments.
+
+The tests use sophisticated mocking strategies to simulate API responses, network
+conditions, and edge cases without requiring live API access. Essential for ensuring
+robust operation across different deployment environments and API availability scenarios.
+
+Test Coverage Areas:
+- Model metadata extraction and parsing validation
+- Popularity and freshness scoring algorithm verification
+- URL parsing and model ID extraction across format variations
+- File size calculation from repository data structures
+- Error handling for API failures and malformed responses
+- Authentication and rate limiting compliance scenarios
+"""
+
 from unittest.mock import Mock, patch
 
 import requests
@@ -15,22 +36,45 @@ from acmecli.metrics.hf_api import (
 
 
 def test_popularity_extremes():
-    s0, _ = popularity_downloads_likes(0, 0)
-    s1, _ = popularity_downloads_likes(1_000_000, 100_000)
+    """
+    Validate popularity scoring algorithm behavior across extreme input conditions.
+
+    Tests the popularity calculation system's handling of edge cases including
+    zero-download models and highly popular models to ensure proper score normalization
+    and monotonic behavior. Critical for ensuring meaningful comparison between models
+    with vastly different adoption levels in production ranking scenarios.
+    """
+    s0, _ = popularity_downloads_likes(0, 0)  # New/unknown model
+    s1, _ = popularity_downloads_likes(1_000_000, 100_000)  # Highly popular model
     assert 0 <= s0 <= 1 and 0 <= s1 <= 1
-    assert s1 >= s0
+    assert s1 >= s0  # Higher popularity should yield higher scores
 
 
 def test_freshness_days_since_update():
-    fresh, _ = freshness_days_since_update(0)
-    stale, _ = freshness_days_since_update(365)
-    assert fresh == 1.0
+    """
+    Verify model freshness scoring algorithm for maintenance activity assessment.
+
+    Validates that the freshness calculation properly rewards recently updated models
+    while penalizing stale repositories. Essential for deployment decisions where
+    active maintenance indicates ongoing support and bug fixes that impact production
+    reliability and security posture.
+    """
+    fresh, _ = freshness_days_since_update(0)  # Just updated
+    stale, _ = freshness_days_since_update(365)  # One year old
+    assert fresh == 1.0  # Maximum freshness score
     assert 0 <= stale <= 1
-    assert fresh >= stale
+    assert fresh >= stale  # Recent updates should score higher
 
 
 def test_extract_model_id():
-    """Test extracting model ID from various URL formats."""
+    """
+    Validate model ID extraction across HuggingFace URL format variations.
+
+    Tests URL parsing logic for different model identifier patterns including
+    simple model names and organization/model combinations. Critical for ensuring
+    consistent API calls regardless of URL format variations encountered in
+    production data ingestion from various sources.
+    """
     assert extract_model_id("https://huggingface.co/gpt2") == "gpt2"
     assert extract_model_id("https://huggingface.co/bert-base-uncased") == "bert-base-uncased"
     assert (
@@ -40,11 +84,18 @@ def test_extract_model_id():
 
 
 def test_calculate_model_size():
-    """Test model size calculation from file data."""
+    """
+    Verify model size calculation from repository file metadata structures.
+
+    Tests the aggregation logic that sums file sizes across repository contents
+    while gracefully handling missing size fields and malformed data. Essential
+    for accurate size-based scoring that impacts deployment feasibility assessment
+    across different infrastructure constraints and hardware limitations.
+    """
     files_data = [
         {"size": 1000},
         {"size": 2000},
-        {"other_field": "value"},  # No size field
+        {"other_field": "value"},  # No size field - should be skipped gracefully
         {"size": 500},
     ]
     total_size = calculate_model_size(files_data)

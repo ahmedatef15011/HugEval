@@ -1,4 +1,15 @@
-"""Tests for LLM analysis functionality."""
+"""
+Comprehensive Test Suite for LLM-Enhanced Documentation Analysis
+
+This test suite validates the sophisticated LLM integration system that enhances model
+evaluation through advanced natural language processing of README documentation.
+Tests cover both OpenAI API integration and local fallback analysis to ensure
+robust operation across different deployment environments.
+
+Key test scenarios include API availability detection, documentation quality scoring,
+metric enhancement algorithms, and error handling resilience. Critical for ensuring
+the LLM integration meets specification requirements while maintaining reliability.
+"""
 
 from unittest.mock import patch
 
@@ -10,7 +21,12 @@ from acmecli.llm_analysis import (
 
 
 def test_analyze_readme_locally_empty():
-    """Test local README analysis with empty content."""
+    """
+    Validate baseline behavior with empty documentation content.
+
+    Tests the local analysis system's handling of models with no README
+    documentation, ensuring graceful degradation and meaningful default scores.
+    """
     result = _analyze_readme_locally("", "test-model")
 
     assert result["documentation_quality"] == 0.0
