@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import requests
 
@@ -34,7 +34,8 @@ def fetch_model_info(model_id: str) -> Dict[str, Any]:
             f"{HF_API_BASE}/models/{model_id}", timeout=10, headers={"User-Agent": "ACME-CLI/0.1.0"}
         )
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        return data if isinstance(data, dict) else {}
     except requests.RequestException as e:
         logger.warning(f"Failed to fetch model info for {model_id}: {e}")
         return {}
@@ -49,45 +50,58 @@ def fetch_model_files(model_id: str) -> Dict[str, Any]:
             headers={"User-Agent": "ACME-CLI/0.1.0"},
         )
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        return data if isinstance(data, dict) else {}
     except requests.RequestException as e:
         logger.warning(f"Failed to fetch model files for {model_id}: {e}")
         return {}
 
 
-def calculate_model_size(files_data: list) -> int:
+def calculate_model_size(files_data: List[Dict[str, Any]]) -> int:
     """Calculate total model size from files data."""
     total_size = 0
     for file_info in files_data:
         if isinstance(file_info, dict) and "size" in file_info:
-            total_size += file_info.get("size", 0)
+            size_value = file_info.get("size", 0)
+            if isinstance(size_value, int):
+                total_size += size_value
     return total_size
 
 
 def get_model_downloads(model_info: Dict[str, Any]) -> int:
     """Extract download count from model info."""
-    return model_info.get("downloads", 0)
+    downloads = model_info.get("downloads", 0)
+    return downloads if isinstance(downloads, int) else 0
 
 
 def get_model_likes(model_info: Dict[str, Any]) -> int:
     """Extract likes count from model info."""
-    return model_info.get("likes", 0)
+    likes = model_info.get("likes", 0)
+    return likes if isinstance(likes, int) else 0
 
 
 def get_model_license(model_info: Dict[str, Any]) -> str:
     """Extract license information from model info."""
     # Try different places where license might be stored
-    license_info = model_info.get("cardData", {}).get("license", "")
-    if not license_info:
-        license_info = model_info.get("license", "")
-    if not license_info:
-        # Check in tags
-        tags = model_info.get("tags", [])
+    card_data = model_info.get("cardData", {})
+    if isinstance(card_data, dict):
+        license_info = card_data.get("license", "")
+        if isinstance(license_info, str) and license_info:
+            return license_info
+
+    # Try direct license field
+    license_direct = model_info.get("license", "")
+    if isinstance(license_direct, str) and license_direct:
+        return license_direct
+
+    # Check in tags
+    tags = model_info.get("tags", [])
+    if isinstance(tags, list):
         for tag in tags:
             if isinstance(tag, str) and ("license:" in tag.lower() or "lgpl" in tag.lower()):
-                license_info = tag
-                break
-    return license_info
+                return tag
+
+    return ""  # Return empty string if no license found
 
 
 def get_days_since_update(model_info: Dict[str, Any]) -> int:
@@ -223,12 +237,16 @@ def estimate_dataset_presence(model_info: Dict[str, Any]) -> bool:
     """Estimate if model has associated dataset."""
     # Check tags for dataset mentions
     tags = model_info.get("tags", [])
-    for tag in tags:
-        if isinstance(tag, str) and any(
-            word in tag.lower() for word in ["dataset", "data", "training"]
-        ):
-            return True
-    return model_info.get("downloads", 0) > 1000  # Popular models likely have datasets
+    if isinstance(tags, list):
+        for tag in tags:
+            if isinstance(tag, str) and any(
+                word in tag.lower() for word in ["dataset", "data", "training"]
+            ):
+                return True
+
+    # Popular models likely have datasets
+    downloads = model_info.get("downloads", 0)
+    return isinstance(downloads, int) and downloads > 1000
 
 
 def estimate_code_presence(model_info: Dict[str, Any]) -> bool:

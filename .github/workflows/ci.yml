@@ -14,5 +14,5 @@ jobs:
       - run: python -m isort . --profile black --line-length 100 --check-only
       - run: flake8
       - run: mypy acmecli
-      - run: coverage run -m pytest -q
+      - run: coverage run -m pytest tests/ -q
       - run: coverage report -m
