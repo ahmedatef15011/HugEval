@@ -2,12 +2,14 @@
 set -euo pipefail
 
 # --- pick a Python ---
-if command -v python3 >/dev/null 2>&1; then
+if command -v py >/dev/null 2>&1; then
+  PY=py
+elif command -v python3 >/dev/null 2>&1; then
   PY=python3
 elif command -v python >/dev/null 2>&1; then
   PY=python
 else
-  echo "Error: Python not found (looked for python3, then python)." >&2
+  echo "Error: Python not found (looked for py, python3, then python)." >&2
   exit 1
 fi
 
