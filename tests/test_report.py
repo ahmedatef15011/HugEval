@@ -109,21 +109,20 @@ def test_generate_summary_report():
         }
     ]
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
-        report_path = generate_summary_report(models, tmp.name)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir) / "report.txt"
+        report_path = generate_summary_report(models, str(tmp_path))
 
         # Check that file was created
         assert Path(report_path).exists()
 
         # Read and verify content
-        content = Path(report_path).read_text()
+        content = Path(report_path).read_text(encoding="utf-8")
         assert "ACME MODEL EVALUATION SUMMARY REPORT" in content
         assert "Total Models Evaluated: 1" in content
         assert "Average Quality Score: 75.0%" in content
         assert "gpt2" in content
 
-        # Cleanup
-        Path(report_path).unlink()
 
 
 @patch("acmecli.report.datetime")
@@ -141,9 +140,10 @@ def test_generate_summary_report_with_timestamp(mock_datetime):
         }
     ]
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
-        report_path = generate_summary_report(models, tmp.name)
-        content = Path(report_path).read_text()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir) / "report.txt"
+        report_path = generate_summary_report(models, str(tmp_path))
+        content = Path(report_path).read_text(encoding="utf-8")
 
         assert "Generated: 2025-09-21 14:30:00" in content
         Path(report_path).unlink()
