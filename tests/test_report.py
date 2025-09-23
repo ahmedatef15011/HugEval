@@ -18,7 +18,9 @@ def test_extract_model_name():
     assert extract_model_name("https://huggingface.co/bert-base-uncased") == "bert-base-uncased"
     assert (
         extract_model_name(
-            "https://huggingface.co/microsoft/DialoGPT-medium") == "DialoGPT-medium"
+            "https://huggingface.co/microsoft/DialoGPT-medium"
+        )
+        == "DialoGPT-medium"
     )
     assert extract_model_name("not-a-huggingface-url") == "not-a-huggingface-url"
 
@@ -123,7 +125,6 @@ def test_generate_summary_report():
         assert "Total Models Evaluated: 1" in content
         assert "Average Quality Score: 75.0%" in content
         assert "gpt2" in content
-
 
 
 @patch("acmecli.report.datetime")
