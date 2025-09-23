@@ -17,7 +17,8 @@ def test_extract_model_name():
     assert extract_model_name("https://huggingface.co/gpt2") == "gpt2"
     assert extract_model_name("https://huggingface.co/bert-base-uncased") == "bert-base-uncased"
     assert (
-        extract_model_name("https://huggingface.co/microsoft/DialoGPT-medium") == "DialoGPT-medium"
+        extract_model_name(
+            "https://huggingface.co/microsoft/DialoGPT-medium") == "DialoGPT-medium"
     )
     assert extract_model_name("not-a-huggingface-url") == "not-a-huggingface-url"
 
