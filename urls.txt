@@ -1,1 +1,1 @@
-https://huggingface.co/gpt66
+https://huggingface.co/gpt2
