@@ -21,6 +21,7 @@ Test Coverage Areas:
 
 from unittest.mock import Mock, patch
 
+import pytest
 import requests
 
 from acmecli.metrics.hf_api import (
@@ -134,6 +135,7 @@ def test_fetch_model_info_success(mock_get):
     mock_response = Mock()
     mock_response.json.return_value = {"name": "gpt2", "downloads": 1000}
     mock_response.raise_for_status.return_value = None
+    mock_response.status_code = 200
     mock_get.return_value = mock_response
 
     result = fetch_model_info("gpt2")
@@ -145,8 +147,8 @@ def test_fetch_model_info_failure(mock_get):
     """Test model info fetching with API failure."""
     mock_get.side_effect = requests.RequestException("API Error")
 
-    result = fetch_model_info("nonexistent-model")
-    assert result == {}
+    with pytest.raises(RuntimeError, match="network error contacting HF"):
+        fetch_model_info("nonexistent-model")
 
 
 @patch("acmecli.metrics.hf_api.fetch_model_info")

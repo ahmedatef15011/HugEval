@@ -23,6 +23,8 @@ import json
 import sys
 from typing import Iterable, Iterator
 
+import pytest
+
 from acmecli import main as app
 
 
@@ -83,8 +85,12 @@ def test_main_prints_ndjson_for_models(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["prog", str(p)])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
 
-    # Execute main application workflow
-    app.main()
+    # Execute main application workflow - expect SystemExit(1) due to invalid URLs
+    with pytest.raises(SystemExit) as exc_info:
+        app.main()
+    
+    # Validate that it exits with code 1 due to invalid URLs
+    assert exc_info.value.code == 1
 
     # Validate NDJSON output format and content filtering
     out = capsys.readouterr().out.strip().splitlines()
@@ -118,7 +124,12 @@ def test_main_with_summary_flag(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["prog", str(p), "--summary"])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
 
-    app.main()
+    # Execute main application workflow - expect SystemExit(0) for successful processing
+    with pytest.raises(SystemExit) as exc_info:
+        app.main()
+    
+    # Validate that it exits with code 0 for success
+    assert exc_info.value.code == 0
 
     out = capsys.readouterr().out.strip()
     assert "Results saved to:" in out
@@ -135,7 +146,12 @@ def test_main_with_custom_output(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["prog", str(p), "--summary", "--output", "test_analysis"])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
 
-    app.main()
+    # Execute main application workflow - expect SystemExit(0) for successful processing
+    with pytest.raises(SystemExit) as exc_info:
+        app.main()
+    
+    # Validate that it exits with code 0 for success
+    assert exc_info.value.code == 0
 
     out = capsys.readouterr().out.strip()
     assert "test_analysis" in out
@@ -149,7 +165,12 @@ def test_main_empty_file(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["prog", str(p)])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
 
-    app.main()
+    # Execute main application workflow - expect SystemExit(1) for empty file
+    with pytest.raises(SystemExit) as exc_info:
+        app.main()
+    
+    # Validate that it exits with code 1 for empty file
+    assert exc_info.value.code == 1
 
     out = capsys.readouterr().out.strip()
     assert out == ""  # No output for empty file
@@ -163,7 +184,12 @@ def test_main_no_model_urls(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["prog", str(p)])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
 
-    app.main()
+    # Execute main application workflow - expect SystemExit(1) for no model URLs
+    with pytest.raises(SystemExit) as exc_info:
+        app.main()
+    
+    # Validate that it exits with code 1 for no valid model URLs
+    assert exc_info.value.code == 1
 
     out = capsys.readouterr().out.strip()
     assert out == ""  # No MODEL URLs = no output
