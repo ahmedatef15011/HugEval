@@ -31,3 +31,8 @@ acmecli.log
 .idea/
 .vscode/
 *.swp
+
+# Generated test files
+*_summary.txt
+evaluation_*.jsonl
+test_analysis_*.jsonl

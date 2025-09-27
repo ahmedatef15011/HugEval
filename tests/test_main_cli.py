@@ -88,7 +88,7 @@ def test_main_prints_ndjson_for_models(tmp_path, monkeypatch, capsys):
     # Execute main application workflow - expect SystemExit(1) due to invalid URLs
     with pytest.raises(SystemExit) as exc_info:
         app.main()
-    
+
     # Validate that it exits with code 1 due to invalid URLs
     assert exc_info.value.code == 1
 
@@ -127,7 +127,7 @@ def test_main_with_summary_flag(tmp_path, monkeypatch, capsys):
     # Execute main application workflow - expect SystemExit(0) for successful processing
     with pytest.raises(SystemExit) as exc_info:
         app.main()
-    
+
     # Validate that it exits with code 0 for success
     assert exc_info.value.code == 0
 
@@ -149,7 +149,7 @@ def test_main_with_custom_output(tmp_path, monkeypatch, capsys):
     # Execute main application workflow - expect SystemExit(0) for successful processing
     with pytest.raises(SystemExit) as exc_info:
         app.main()
-    
+
     # Validate that it exits with code 0 for success
     assert exc_info.value.code == 0
 
@@ -168,7 +168,7 @@ def test_main_empty_file(tmp_path, monkeypatch, capsys):
     # Execute main application workflow - expect SystemExit(1) for empty file
     with pytest.raises(SystemExit) as exc_info:
         app.main()
-    
+
     # Validate that it exits with code 1 for empty file
     assert exc_info.value.code == 1
 
@@ -187,7 +187,7 @@ def test_main_no_model_urls(tmp_path, monkeypatch, capsys):
     # Execute main application workflow - expect SystemExit(1) for no model URLs
     with pytest.raises(SystemExit) as exc_info:
         app.main()
-    
+
     # Validate that it exits with code 1 for no valid model URLs
     assert exc_info.value.code == 1
 

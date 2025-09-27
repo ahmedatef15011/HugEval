@@ -3,11 +3,8 @@ Additional tests to improve code coverage for main.py error handling paths.
 """
 
 import json
-import os
 import sys
-import tempfile
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -18,12 +15,13 @@ from acmecli.metrics.hf_api import ModelLookupError
 
 class DummyPoolWithFailure:
     """Mock ProcessPoolExecutor that simulates failure."""
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, *args):
         pass
-    
+
     def submit(self, func, *args):
         # Simulate failure
         raise Exception("ProcessPoolExecutor failed")
@@ -32,11 +30,11 @@ class DummyPoolWithFailure:
 def test_write_error_line_function(tmp_path):
     """Test the _write_error_line helper function."""
     error_file = tmp_path / "errors.jsonl"
-    
+
     # Test writing an error line
     error_record = {"url": "https://example.com", "error": "test error", "kind": "test"}
     _write_error_line(str(error_file), error_record)
-    
+
     # Verify the file was created and contains the correct data
     assert error_file.exists()
     content = error_file.read_text()
@@ -47,36 +45,40 @@ def test_main_with_error_file(tmp_path, monkeypatch, capsys):
     """Test main function with error file logging."""
     p = tmp_path / "urls.txt"
     p.write_text("https://huggingface.co/gpt2\nhttps://huggingface.co/datasets/squad\n")
-    
+
     error_file = tmp_path / "errors.jsonl"
-    
+
     # Test with error file
     monkeypatch.setattr(sys, "argv", ["prog", str(p), "--error-file", str(error_file)])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
-    
+
     # Mock ProcessPoolExecutor to simulate failure scenario
     class DummyPool:
         def __enter__(self):
             return self
+
         def __exit__(self, *args):
             pass
+
         def submit(self, func, url):
             future = Mock()
             future.result.side_effect = ModelLookupError("test-model", 404, "Not Found")
             return future
-    
+
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
-    
+
     with pytest.raises(SystemExit) as exc_info:
         app.main()
-    
+
     assert exc_info.value.code == 1
-    
+
     # Verify error file was created with classification errors
     assert error_file.exists()
-    error_lines = error_file.read_text().strip().split('\n')
+    error_lines = error_file.read_text().strip().split("\n")
     # Should have one classification error for the dataset URL
-    classification_errors = [json.loads(line) for line in error_lines if json.loads(line)["kind"] == "classify"]
+    classification_errors = [
+        json.loads(line) for line in error_lines if json.loads(line)["kind"] == "classify"
+    ]
     assert len(classification_errors) == 1
     assert classification_errors[0]["url"] == "https://huggingface.co/datasets/squad"
 
@@ -92,37 +94,44 @@ def test_main_with_successful_summary_generation(tmp_path, monkeypatch, capsys):
     """Test successful summary generation path."""
     p = tmp_path / "urls.txt"
     p.write_text("https://huggingface.co/gpt2\n")
-    
+
     class SuccessfulPool:
         def __enter__(self):
             return self
+
         def __exit__(self, *args):
             pass
+
         def submit(self, func, url):
             future = Mock()
             future.result.return_value = {
-                "name": url, 
-                "category": "MODEL", 
+                "name": url,
+                "category": "MODEL",
                 "net_score": 0.8,
                 "ramp_up_time": 0.9,
                 "bus_factor": 0.7,
                 "performance_claims": 0.8,
                 "license": 1.0,
-                "size_score": {"raspberry_pi": 0.5, "jetson_nano": 0.6, "desktop_pc": 0.9, "aws_server": 1.0},
+                "size_score": {
+                    "raspberry_pi": 0.5,
+                    "jetson_nano": 0.6,
+                    "desktop_pc": 0.9,
+                    "aws_server": 1.0,
+                },
                 "dataset_and_code_score": 0.9,
                 "dataset_quality": 0.8,
-                "code_quality": 0.9
+                "code_quality": 0.9,
             }
             return future
-    
+
     monkeypatch.setattr(sys, "argv", ["prog", str(p), "--summary"])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: SuccessfulPool())
-    
+
     with pytest.raises(SystemExit) as exc_info:
         app.main()
-    
+
     assert exc_info.value.code == 0
-    
+
     captured = capsys.readouterr()
     assert "Results saved to:" in captured.out
     assert "Summary report:" in captured.out
@@ -131,17 +140,18 @@ def test_main_with_successful_summary_generation(tmp_path, monkeypatch, capsys):
 
 class DummyPool:
     """Mock ProcessPoolExecutor for testing."""
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, *args):
         pass
-    
+
     def submit(self, func, url):
         future = Mock()
         future.result.return_value = {
-            "name": url, 
-            "category": "MODEL", 
+            "name": url,
+            "category": "MODEL",
             "net_score": 0.8,
             "net_score_latency": 0,
             "ramp_up_time": 0.9,
@@ -152,13 +162,18 @@ class DummyPool:
             "performance_claims_latency": 0,
             "license": 1.0,
             "license_latency": 0,
-            "size_score": {"raspberry_pi": 0.5, "jetson_nano": 0.6, "desktop_pc": 0.9, "aws_server": 1.0},
+            "size_score": {
+                "raspberry_pi": 0.5,
+                "jetson_nano": 0.6,
+                "desktop_pc": 0.9,
+                "aws_server": 1.0,
+            },
             "size_score_latency": 0,
             "dataset_and_code_score": 0.9,
             "dataset_and_code_score_latency": 0,
             "dataset_quality": 0.8,
             "dataset_quality_latency": 0,
             "code_quality": 0.9,
-            "code_quality_latency": 0
+            "code_quality_latency": 0,
         }
         return future

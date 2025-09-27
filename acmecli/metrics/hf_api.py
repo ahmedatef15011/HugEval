@@ -22,6 +22,7 @@ HF_API_BASE = "https://huggingface.co/api"
 
 class ModelLookupError(RuntimeError):
     """Raised when a model cannot be fetched (not found, private, or other HTTP error)."""
+
     def __init__(self, model_id: str, status: int, msg: str):
         super().__init__(f"{model_id}: HTTP {status} - {msg}")
         self.model_id = model_id
@@ -52,12 +53,18 @@ def extract_model_id(url: str) -> str:
 def fetch_readme_content(model_id: str, token: Optional[str] = None) -> str:
     """Retrieve README content (best-effort; never raises)."""
     try:
-        r = requests.get(f"https://huggingface.co/{model_id}/raw/main/README.md",
-                         timeout=10, headers=_headers(token))
+        r = requests.get(
+            f"https://huggingface.co/{model_id}/raw/main/README.md",
+            timeout=10,
+            headers=_headers(token),
+        )
         if r.status_code == 200:
             return r.text
-        r = requests.get(f"https://huggingface.co/{model_id}/raw/main/README",
-                         timeout=10, headers=_headers(token))
+        r = requests.get(
+            f"https://huggingface.co/{model_id}/raw/main/README",
+            timeout=10,
+            headers=_headers(token),
+        )
         if r.status_code == 200:
             return r.text
         logger.info(f"No README found for {model_id} (last status {r.status_code})")
@@ -87,8 +94,9 @@ def fetch_model_info(model_id: str, token: Optional[str] = None) -> Dict[str, An
 def fetch_model_files(model_id: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
     """Best-effort file listing. Returns [] on failure."""
     try:
-        r = requests.get(f"{HF_API_BASE}/models/{model_id}/tree/main",
-                         timeout=10, headers=_headers(token))
+        r = requests.get(
+            f"{HF_API_BASE}/models/{model_id}/tree/main", timeout=10, headers=_headers(token)
+        )
         if r.status_code == 200:
             data = r.json()
             return data if isinstance(data, list) else []
@@ -189,8 +197,12 @@ def build_context_from_api(url: str, token: Optional[str] = None) -> Dict[str, A
 
 # ---------- Heuristics ----------
 
-def estimate_docs_quality(model_info: Dict[str, Any], readme_content: str = "", model_id: str = "") -> Dict[str, float]:
+
+def estimate_docs_quality(
+    model_info: Dict[str, Any], readme_content: str = "", model_id: str = ""
+) -> Dict[str, float]:
     from ..llm_analysis import analyze_readme_with_llm
+
     downloads = model_info.get("downloads", 0)
     likes = model_info.get("likes", 0)
     popularity_score = min(1.0, (downloads / 10000) * 0.3 + (likes / 100) * 0.7)
@@ -225,7 +237,9 @@ def estimate_dataset_presence(model_info: Dict[str, Any]) -> bool:
     tags = model_info.get("tags", [])
     if isinstance(tags, list):
         for tag in tags:
-            if isinstance(tag, str) and any(w in tag.lower() for w in ["dataset", "data", "training"]):
+            if isinstance(tag, str) and any(
+                w in tag.lower() for w in ["dataset", "data", "training"]
+            ):
                 return True
     d = model_info.get("downloads", 0)
     return isinstance(d, int) and d > 1000
@@ -242,7 +256,11 @@ def estimate_dataset_docs(model_info: Dict[str, Any]) -> Dict[str, float]:
 
 def estimate_code_quality(model_info: Dict[str, Any]) -> Dict[str, Any]:
     p = min(1.0, model_info.get("downloads", 0) / 10000)
-    return {"flake8_errors": max(0, int(15 * (1 - p))), "isort_sorted": p > 0.3, "mypy_errors": max(0, int(10 * (1 - p)))}
+    return {
+        "flake8_errors": max(0, int(15 * (1 - p))),
+        "isort_sorted": p > 0.3,
+        "mypy_errors": max(0, int(10 * (1 - p))),
+    }
 
 
 def estimate_performance_claims(model_info: Dict[str, Any]) -> Dict[str, bool]:
@@ -253,7 +271,9 @@ def estimate_performance_claims(model_info: Dict[str, Any]) -> Dict[str, bool]:
 
 
 @timed
-def popularity_downloads_likes(downloads: int, likes: int, d_cap: int = 100_000, l_cap: int = 1_000) -> float:
+def popularity_downloads_likes(
+    downloads: int, likes: int, d_cap: int = 100_000, l_cap: int = 1_000
+) -> float:
     d_norm = min(1.0, math.log1p(max(0, downloads)) / math.log1p(d_cap))
     l_norm = min(1.0, math.log1p(max(0, likes)) / math.log1p(l_cap))
     return 0.6 * d_norm + 0.4 * l_norm

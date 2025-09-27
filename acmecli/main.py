@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Tuple
 
 from .io_utils import read_urls, write_ndjson_line
 from .logging_cfg import setup_logging
-from .metrics.hf_api import build_context_from_api, ModelLookupError
+from .metrics.hf_api import ModelLookupError, build_context_from_api
 from .report import capture_and_summarize_results
 from .scoring import compute_all_scores
 from .urls import Category, classify
@@ -21,10 +21,23 @@ from .urls import Category, classify
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Evaluate Hugging Face models and generate scores")
     ap.add_argument("url_file", nargs="?", help="File with newline-delimited URLs")
-    ap.add_argument("--summary", action="store_true", help="Generate a human-readable summary report (saves files)")
-    ap.add_argument("--output", "-o", default="evaluation", help="Base filename for output files (default: evaluation)")
-    ap.add_argument("--fail-fast", action="store_true", help="Stop immediately on the first model failure")
-    ap.add_argument("--error-file", default=None, help="Write failures to this NDJSON file (one JSON per line)")
+    ap.add_argument(
+        "--summary",
+        action="store_true",
+        help="Generate a human-readable summary report (saves files)",
+    )
+    ap.add_argument(
+        "--output",
+        "-o",
+        default="evaluation",
+        help="Base filename for output files (default: evaluation)",
+    )
+    ap.add_argument(
+        "--fail-fast", action="store_true", help="Stop immediately on the first model failure"
+    )
+    ap.add_argument(
+        "--error-file", default=None, help="Write failures to this NDJSON file (one JSON per line)"
+    )
     return ap.parse_args()
 
 
@@ -52,7 +65,8 @@ def main() -> None:
     # Usage/config errors -> exit 1 (per autograder requirement)
     if not args.url_file:
         print(
-            "ERROR: missing URL_FILE. Usage: ./run URL_FILE [--summary] [--fail-fast] [--error-file PATH]",
+            "ERROR: missing URL_FILE. Usage: ./run URL_FILE [--summary] "
+            "[--fail-fast] [--error-file PATH]",
             file=sys.stderr,
         )
         raise SystemExit(1)
