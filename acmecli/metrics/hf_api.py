@@ -1,21 +1,7 @@
 """
 HuggingFace API Integration for Real-Time Model Analysis
 
-This module provides comprehensive integration with the HuggingFace Hub API to gather
-real-time model metadata, repository information, and documentation for trustworthy
-ML model evaluation. Includes intelligent fallback mechanisms and LLM-enhanced analysis
-for robust operation in production environments.
-
-The system implements sophisticated error handling, rate limiting awareness, and
-data quality estimation algorithms that work with live API data to provide accurate
-assessments of model trustworthiness and deployment readiness across thousands of
-models in the HuggingFace ecosystem.
-
-Key Features:
-- Real-time model metadata retrieval with automatic retry logic
-- Documentation quality assessment using advanced NLP techniques
-- Performance optimization through intelligent caching and batching
-- Comprehensive error handling for production reliability
+(Edited to fail hard on 4xx and avoid silent fallbacks for missing/private models.)
 """
 
 from __future__ import annotations
@@ -23,7 +9,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -31,144 +17,89 @@ from .base import timed
 
 logger = logging.getLogger(__name__)
 
-# HuggingFace Hub API configuration for production reliability
 HF_API_BASE = "https://huggingface.co/api"
+
+
+class ModelLookupError(RuntimeError):
+    """Raised when a model cannot be fetched (not found, private, or other HTTP error)."""
+    def __init__(self, model_id: str, status: int, msg: str):
+        super().__init__(f"{model_id}: HTTP {status} - {msg}")
+        self.model_id = model_id
+        self.status = status
+        self.msg = msg
+
+
+def _headers(token: Optional[str] = None) -> Dict[str, str]:
+    h = {"User-Agent": "ACME-CLI/0.1.0", "Accept": "application/json"}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return h
 
 
 def extract_model_id(url: str) -> str:
     """
-    Parse HuggingFace URL to extract clean model identifier for API calls.
-
-    Handles both simple model names and organization/model patterns while
-    validating URL format for reliable API integration. Essential for
-    consistent model identification across different URL variations.
-
-    URL Format Support:
-    - Standard models: huggingface.co/gpt2 → "gpt2"
-    - Organization models: huggingface.co/microsoft/DialoGPT-medium → "microsoft/DialoGPT-medium"
-    - Direct model IDs: Already clean identifiers pass through unchanged
-
-    Args:
-        url: HuggingFace model URL in various supported formats
-
-    Returns:
-        str: Clean model identifier for API requests (e.g., "gpt2" or "microsoft/DialoGPT-medium")
-
-    Raises:
-        ValueError: If URL format is invalid or not a HuggingFace URL
+    Accepts:
+      - https://huggingface.co/gpt2 -> "gpt2"
+      - https://huggingface.co/org/model -> "org/model"
     """
     if "huggingface.co/" in url:
         parts = url.rstrip("/").split("/")
-        if len(parts) >= 4:  # https://huggingface.co/model_name
-            return "/".join(parts[3:])  # Handle org/model format
+        if len(parts) >= 4:
+            return "/".join(parts[3:])
     raise ValueError(f"Invalid Hugging Face URL: {url}")
 
 
-def fetch_readme_content(model_id: str) -> str:
-    """
-    Retrieve README documentation from HuggingFace model repository for quality analysis.
-
-    Implements intelligent README discovery by checking multiple file locations and
-    formats commonly used in HuggingFace repositories. The retrieved content enables
-    comprehensive documentation quality assessment and LLM-enhanced analysis for
-    accurate ramp-up time and usability scoring.
-
-    Discovery Strategy:
-    - Checks README.md (primary), README.txt, and README files
-    - Handles different encoding formats and file structures
-    - Provides graceful fallback when documentation is unavailable
-
-    This function is critical for documentation quality metrics that directly impact
-    team productivity and deployment success rates in production environments.
-
-    Args:
-        model_id: HuggingFace model identifier (e.g., "bert-base-uncased")
-
-    Returns:
-        str: README content for documentation quality analysis, empty string if unavailable
-    """
+def fetch_readme_content(model_id: str, token: Optional[str] = None) -> str:
+    """Retrieve README content (best-effort; never raises)."""
     try:
-        # Primary attempt: fetch README.md from main branch with robust error handling
-        response = requests.get(
-            f"https://huggingface.co/{model_id}/raw/main/README.md",
-            timeout=10,
-            headers={"User-Agent": "ACME-CLI/0.1.0"},
-        )
-        if response.status_code == 200:
-            return response.text
-
-        # Fallback attempt: try README without extension for compatibility
-        response = requests.get(
-            f"https://huggingface.co/{model_id}/raw/main/README",
-            timeout=10,
-            headers={"User-Agent": "ACME-CLI/0.1.0"},
-        )
-        if response.status_code == 200:
-            return response.text
-
-        logger.info(f"No README found for {model_id}")
+        r = requests.get(f"https://huggingface.co/{model_id}/raw/main/README.md",
+                         timeout=10, headers=_headers(token))
+        if r.status_code == 200:
+            return r.text
+        r = requests.get(f"https://huggingface.co/{model_id}/raw/main/README",
+                         timeout=10, headers=_headers(token))
+        if r.status_code == 200:
+            return r.text
+        logger.info(f"No README found for {model_id} (last status {r.status_code})")
         return ""
-
     except requests.RequestException as e:
         logger.warning(f"Failed to fetch README for {model_id}: {e}")
         return ""
 
 
-def fetch_model_info(model_id: str) -> Dict[str, Any]:
+def fetch_model_info(model_id: str, token: Optional[str] = None) -> Dict[str, Any]:
     """
-    Retrieve comprehensive model metadata from HuggingFace Hub API for trustworthiness assessment.
-
-    Gathers critical model information including download statistics, creation date,
-    library metadata, and repository activity. This data feeds into multiple scoring
-    algorithms including bus factor analysis, popularity assessment, and deployment
-    readiness evaluation.
-
-    API Integration Features:
-    - Robust error handling with informative logging
-    - Timeout protection for production reliability
-    - Structured data extraction for consistent processing
-    - Rate limiting awareness for scalable operation
-
-    The retrieved metadata is essential for comprehensive model evaluation across
-    multiple trustworthiness dimensions and deployment risk assessment.
-
-    Args:
-        model_id: HuggingFace model identifier for API query
-
-    Returns:
-        Dict[str, Any]: Structured model metadata including downloads, dates, and repository info
+    Authoritative existence check. Raises ModelLookupError on non-200.
     """
+    url = f"{HF_API_BASE}/models/{model_id}"
     try:
-        # Get model info
-        response = requests.get(
-            f"{HF_API_BASE}/models/{model_id}", timeout=10, headers={"User-Agent": "ACME-CLI/0.1.0"}
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data if isinstance(data, dict) else {}
+        r = requests.get(url, timeout=10, headers=_headers(token))
+        if r.status_code != 200:
+            raise ModelLookupError(model_id, r.status_code, r.reason or "error")
+        data = r.json()
+        if not isinstance(data, dict):
+            raise ModelLookupError(model_id, 500, "unexpected JSON payload")
+        return data
     except requests.RequestException as e:
-        logger.warning(f"Failed to fetch model info for {model_id}: {e}")
-        return {}
+        raise RuntimeError(f"network error contacting HF for {model_id}: {e}") from e
 
 
-def fetch_model_files(model_id: str) -> Dict[str, Any]:
-    """Fetch model files information to calculate size."""
+def fetch_model_files(model_id: str, token: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Best-effort file listing. Returns [] on failure."""
     try:
-        response = requests.get(
-            f"https://huggingface.co/api/models/{model_id}/tree/main",
-            timeout=10,
-            headers={"User-Agent": "ACME-CLI/0.1.0"},
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data if isinstance(data, dict) else {}
+        r = requests.get(f"{HF_API_BASE}/models/{model_id}/tree/main",
+                         timeout=10, headers=_headers(token))
+        if r.status_code == 200:
+            data = r.json()
+            return data if isinstance(data, list) else []
+        logger.info(f"model files listing not available for {model_id}: HTTP {r.status_code}")
+        return []
     except requests.RequestException as e:
         logger.warning(f"Failed to fetch model files for {model_id}: {e}")
-        return {}
+        return []
 
 
 def calculate_model_size(files_data: List[Dict[str, Any]]) -> int:
-    """Calculate total model size from files data."""
     total_size = 0
     for file_info in files_data:
         if isinstance(file_info, dict) and "size" in file_info:
@@ -179,279 +110,155 @@ def calculate_model_size(files_data: List[Dict[str, Any]]) -> int:
 
 
 def get_model_downloads(model_info: Dict[str, Any]) -> int:
-    """Extract download count from model info."""
     downloads = model_info.get("downloads", 0)
     return downloads if isinstance(downloads, int) else 0
 
 
 def get_model_likes(model_info: Dict[str, Any]) -> int:
-    """Extract likes count from model info."""
     likes = model_info.get("likes", 0)
     return likes if isinstance(likes, int) else 0
 
 
 def get_model_license(model_info: Dict[str, Any]) -> str:
-    """Extract license information from model info."""
-    # Try different places where license might be stored
     card_data = model_info.get("cardData", {})
     if isinstance(card_data, dict):
         license_info = card_data.get("license", "")
         if isinstance(license_info, str) and license_info:
             return license_info
-
-    # Try direct license field
     license_direct = model_info.get("license", "")
     if isinstance(license_direct, str) and license_direct:
         return license_direct
-
-    # Check in tags
     tags = model_info.get("tags", [])
     if isinstance(tags, list):
         for tag in tags:
             if isinstance(tag, str) and ("license:" in tag.lower() or "lgpl" in tag.lower()):
                 return tag
-
-    return ""  # Return empty string if no license found
+    return ""
 
 
 def get_days_since_update(model_info: Dict[str, Any]) -> int:
-    """Calculate days since last update."""
     last_modified = model_info.get("lastModified")
     if not last_modified:
-        return 365  # Default to 1 year if unknown
-
+        return 365
     try:
-        # Parse ISO format datetime
         last_update = datetime.fromisoformat(last_modified.replace("Z", "+00:00"))
         now = datetime.now(last_update.tzinfo)
-        delta = now - last_update
-        return delta.days
+        return (now - last_update).days
     except (ValueError, AttributeError):
-        return 365  # Default if parsing fails
+        return 365
 
 
-def build_context_from_api(url: str) -> Dict[str, Any]:
-    """Build context dictionary from real Hugging Face API data."""
-    try:
-        model_id = extract_model_id(url)
-        logger.info(f"Fetching data for model: {model_id}")
+def build_context_from_api(url: str, token: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Build context strictly from HF API data.
+    Raises ModelLookupError on 401/403/404/etc. (no silent fallback).
+    """
+    model_id = extract_model_id(url)
+    logger.info(f"Fetching data for model: {model_id}")
 
-        # Fetch model information
-        model_info = fetch_model_info(model_id)
-        if not model_info:
-            logger.warning(f"No model info found for {model_id}, using fallback data")
-            return get_fallback_context()
+    model_info = fetch_model_info(model_id, token=token)  # may raise ModelLookupError
+    files_data = fetch_model_files(model_id, token=token)
+    total_bytes = calculate_model_size(files_data) if files_data else 50_000_000
 
-        # Fetch file information for size calculation
-        files_data = fetch_model_files(model_id)
+    downloads = get_model_downloads(model_info)
+    likes = get_model_likes(model_info)
+    license_text = get_model_license(model_info)
+    days_since_update = get_days_since_update(model_info)
+    readme_content = fetch_readme_content(model_id, token=token)
 
-        # Calculate model size
-        if isinstance(files_data, list):
-            total_bytes = calculate_model_size(files_data)
-        else:
-            total_bytes = 50_000_000  # Default 50MB if can't determine
-
-        # Extract other information
-        downloads = get_model_downloads(model_info)
-        likes = get_model_likes(model_info)
-        license_text = get_model_license(model_info)
-        days_since_update = get_days_since_update(model_info)
-
-        # Fetch README content for LLM analysis
-        readme_content = fetch_readme_content(model_id)
-
-        # Build context with real data
-        context = {
-            "total_bytes": total_bytes,
-            "license_text": license_text,
-            "downloads": downloads,
-            "likes": likes,
-            "days_since_update": days_since_update,
-            # TODO: These would require additional API calls or repo scanning
-            # For now, use reasonable defaults based on model popularity
-            "docs": estimate_docs_quality(model_info, readme_content, model_id),
-            "readme_content": readme_content,  # Store for potential future use
-            "contributors": estimate_contributors(model_info),
-            "dataset_present": estimate_dataset_presence(model_info),
-            "code_present": estimate_code_presence(model_info),
-            "dataset_doc": estimate_dataset_docs(model_info),
-            "flake8_errors": estimate_code_quality(model_info)["flake8_errors"],
-            "isort_sorted": estimate_code_quality(model_info)["isort_sorted"],
-            "mypy_errors": estimate_code_quality(model_info)["mypy_errors"],
-            "perf": estimate_performance_claims(model_info),
-        }
-
-        logger.info(f"Successfully built context for {model_id}")
-        return context
-
-    except Exception as e:
-        logger.error(f"Error building context for {url}: {e}")
-        return get_fallback_context()
-
-
-def get_fallback_context() -> Dict[str, Any]:
-    """Return fallback context when API calls fail."""
-    return {
-        "total_bytes": 100_000_000,
-        "license_text": "",
-        "downloads": 0,
-        "likes": 0,
-        "days_since_update": 365,
-        "docs": {
-            "readme": 0.5,
-            "quickstart": 0,
-            "tutorials": 0,
-            "api_docs": 0,
-            "reproducibility": 0,
-        },
-        "contributors": 1,
-        "dataset_present": False,
-        "code_present": False,
-        "dataset_doc": {"source": 0, "license": 0, "splits": 0, "ethics": 0},
-        "flake8_errors": 20,
-        "isort_sorted": False,
-        "mypy_errors": 10,
-        "perf": {"benchmarks": False, "citations": False},
+    context = {
+        "total_bytes": total_bytes,
+        "license_text": license_text,
+        "downloads": downloads,
+        "likes": likes,
+        "days_since_update": days_since_update,
+        "docs": estimate_docs_quality(model_info, readme_content, model_id),
+        "readme_content": readme_content,
+        "contributors": estimate_contributors(model_info),
+        "dataset_present": estimate_dataset_presence(model_info),
+        "code_present": estimate_code_presence(model_info),
+        "dataset_doc": estimate_dataset_docs(model_info),
+        "flake8_errors": estimate_code_quality(model_info)["flake8_errors"],
+        "isort_sorted": estimate_code_quality(model_info)["isort_sorted"],
+        "mypy_errors": estimate_code_quality(model_info)["mypy_errors"],
+        "perf": estimate_performance_claims(model_info),
     }
+    logger.info(f"Successfully built context for {model_id}")
+    return context
 
 
-def estimate_docs_quality(
-    model_info: Dict[str, Any], readme_content: str = "", model_id: str = ""
-) -> Dict[str, float]:
-    """Estimate documentation quality based on available info and LLM analysis."""
-    # Import LLM analysis here to avoid circular imports
+# ---------- Heuristics ----------
+
+def estimate_docs_quality(model_info: Dict[str, Any], readme_content: str = "", model_id: str = "") -> Dict[str, float]:
     from ..llm_analysis import analyze_readme_with_llm
-
-    # Higher quality for models with more downloads/likes
     downloads = model_info.get("downloads", 0)
     likes = model_info.get("likes", 0)
-
-    # Popular models likely have better docs
     popularity_score = min(1.0, (downloads / 10000) * 0.3 + (likes / 100) * 0.7)
-
-    # Base scores from popularity
-    base_scores = {
-        "readme": min(1.0, 0.3 + popularity_score * 0.7),  # Most models have some README
+    base = {
+        "readme": min(1.0, 0.3 + popularity_score * 0.7),
         "quickstart": popularity_score * 0.8,
         "tutorials": popularity_score * 0.6,
         "api_docs": popularity_score * 0.7,
         "reproducibility": popularity_score * 0.5,
     }
-
-    # Enhance with LLM analysis if README content is available
     if readme_content and model_id:
         try:
-            llm_analysis = analyze_readme_with_llm(readme_content, model_id)
-
-            # Enhance README score with LLM insights
-            llm_readme_score = llm_analysis.get("documentation_quality", 0.0)
-            enhanced_readme = base_scores["readme"] * 0.6 + llm_readme_score * 0.4
-
-            # Enhance other scores based on LLM findings
-            if llm_analysis.get("installation_instructions", False):
-                base_scores["quickstart"] = min(1.0, base_scores["quickstart"] + 0.2)
-
-            if llm_analysis.get("usage_examples", False):
-                base_scores["tutorials"] = min(1.0, base_scores["tutorials"] + 0.3)
-
-            if llm_analysis.get("code_blocks_count", 0) >= 2:
-                base_scores["api_docs"] = min(1.0, base_scores["api_docs"] + 0.2)
-
-            base_scores["readme"] = enhanced_readme
-            logger.info(f"Enhanced documentation scores with LLM for {model_id}")
-
+            llm = analyze_readme_with_llm(readme_content, model_id)
+            base["readme"] = base["readme"] * 0.6 + llm.get("documentation_quality", 0.0) * 0.4
+            if llm.get("installation_instructions", False):
+                base["quickstart"] = min(1.0, base["quickstart"] + 0.2)
+            if llm.get("usage_examples", False):
+                base["tutorials"] = min(1.0, base["tutorials"] + 0.3)
+            if llm.get("code_blocks_count", 0) >= 2:
+                base["api_docs"] = min(1.0, base["api_docs"] + 0.2)
         except Exception as e:
             logger.warning(f"LLM enhancement failed for {model_id}: {e}")
-
-    return base_scores
+    return base
 
 
 def estimate_contributors(model_info: Dict[str, Any]) -> int:
-    """Estimate number of contributors."""
-    # Popular models likely have more contributors
-    downloads = model_info.get("downloads", 0)
-    if downloads > 100000:
-        return 8
-    elif downloads > 10000:
-        return 5
-    elif downloads > 1000:
-        return 3
-    else:
-        return 1
+    d = model_info.get("downloads", 0)
+    return 8 if d > 100000 else 5 if d > 10000 else 3 if d > 1000 else 1
 
 
 def estimate_dataset_presence(model_info: Dict[str, Any]) -> bool:
-    """Estimate if model has associated dataset."""
-    # Check tags for dataset mentions
     tags = model_info.get("tags", [])
     if isinstance(tags, list):
         for tag in tags:
-            if isinstance(tag, str) and any(
-                word in tag.lower() for word in ["dataset", "data", "training"]
-            ):
+            if isinstance(tag, str) and any(w in tag.lower() for w in ["dataset", "data", "training"]):
                 return True
-
-    # Popular models likely have datasets
-    downloads = model_info.get("downloads", 0)
-    return isinstance(downloads, int) and downloads > 1000
+    d = model_info.get("downloads", 0)
+    return isinstance(d, int) and d > 1000
 
 
 def estimate_code_presence(model_info: Dict[str, Any]) -> bool:
-    """Estimate if model has associated code."""
-    # Most HF models have some code (at minimum inference code)
     return True
 
 
 def estimate_dataset_docs(model_info: Dict[str, Any]) -> Dict[str, float]:
-    """Estimate dataset documentation quality."""
-    popularity = min(1.0, model_info.get("downloads", 0) / 10000)
-    return {
-        "source": popularity * 0.8,
-        "license": popularity * 0.9,
-        "splits": popularity * 0.7,
-        "ethics": popularity * 0.6,
-    }
+    p = min(1.0, model_info.get("downloads", 0) / 10000)
+    return {"source": p * 0.8, "license": p * 0.9, "splits": p * 0.7, "ethics": p * 0.6}
 
 
 def estimate_code_quality(model_info: Dict[str, Any]) -> Dict[str, Any]:
-    """Estimate code quality metrics."""
-    popularity = min(1.0, model_info.get("downloads", 0) / 10000)
-    # Popular models likely have better code quality
-    return {
-        "flake8_errors": max(0, int(15 * (1 - popularity))),
-        "isort_sorted": popularity > 0.3,
-        "mypy_errors": max(0, int(10 * (1 - popularity))),
-    }
+    p = min(1.0, model_info.get("downloads", 0) / 10000)
+    return {"flake8_errors": max(0, int(15 * (1 - p))), "isort_sorted": p > 0.3, "mypy_errors": max(0, int(10 * (1 - p)))}
 
 
 def estimate_performance_claims(model_info: Dict[str, Any]) -> Dict[str, bool]:
-    """Estimate if model has performance benchmarks/citations."""
-    # Check model card for benchmark mentions
-    card_data = model_info.get("cardData", {})
-    model_card = str(card_data).lower()
-
-    has_benchmarks = any(
-        word in model_card for word in ["benchmark", "eval", "score", "accuracy", "bleu"]
-    )
-    has_citations = "citation" in model_card or model_info.get("downloads", 0) > 5000
-
-    return {
-        "benchmarks": has_benchmarks,
-        "citations": has_citations,
-    }
+    card = str(model_info.get("cardData", {})).lower()
+    has_bench = any(w in card for w in ["benchmark", "eval", "score", "accuracy", "bleu"])
+    has_cite = "citation" in card or model_info.get("downloads", 0) > 5000
+    return {"benchmarks": has_bench, "citations": has_cite}
 
 
 @timed
-def popularity_downloads_likes(
-    downloads: int, likes: int, d_cap: int = 100_000, l_cap: int = 1_000
-) -> float:
-    """Log-scaled normalization for popularity."""
+def popularity_downloads_likes(downloads: int, likes: int, d_cap: int = 100_000, l_cap: int = 1_000) -> float:
     d_norm = min(1.0, math.log1p(max(0, downloads)) / math.log1p(d_cap))
-    likes_norm = min(1.0, math.log1p(max(0, likes)) / math.log1p(l_cap))
-    return 0.6 * d_norm + 0.4 * likes_norm
+    l_norm = min(1.0, math.log1p(max(0, likes)) / math.log1p(l_cap))
+    return 0.6 * d_norm + 0.4 * l_norm
 
 
 @timed
 def freshness_days_since_update(days: int) -> float:
-    """0 days → 1.0; 365+ days → 0.0 linearly."""
     return max(0.0, min(1.0, 1 - (max(0, days) / 365)))
