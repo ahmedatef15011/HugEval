@@ -4,6 +4,7 @@ Additional tests to improve code coverage for main.py error handling paths.
 
 import json
 import sys
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -11,6 +12,14 @@ import pytest
 from acmecli import main as app
 from acmecli.main import _write_error_line
 from acmecli.metrics.hf_api import ModelLookupError
+
+
+def get_test_artifacts_dir():
+    """Get the test artifacts directory path."""
+    project_root = Path(__file__).parent.parent
+    test_artifacts_dir = project_root / "test_artifacts"
+    test_artifacts_dir.mkdir(exist_ok=True)
+    return test_artifacts_dir
 
 
 class DummyPoolWithFailure:
@@ -92,8 +101,12 @@ def test_main_with_error_file(tmp_path, monkeypatch, capsys):
 
 def test_main_with_successful_summary_generation(tmp_path, monkeypatch, capsys):
     """Test successful summary generation path."""
-    p = tmp_path / "urls.txt"
+    test_dir = get_test_artifacts_dir()
+    p = test_dir / "urls.txt"
     p.write_text("https://huggingface.co/gpt2\n")
+
+    # Change to test_artifacts directory to ensure files are created there
+    monkeypatch.chdir(test_dir)
 
     class SuccessfulPool:
         def __enter__(self):

@@ -8,9 +8,18 @@ from pathlib import Path
 from acmecli.report import generate_summary_from_file, load_ndjson_results
 
 
-def test_load_ndjson_results_success(tmp_path):
+def get_test_artifacts_dir():
+    """Get the test artifacts directory path."""
+    project_root = Path(__file__).parent.parent
+    test_artifacts_dir = project_root / "test_artifacts"
+    test_artifacts_dir.mkdir(exist_ok=True)
+    return test_artifacts_dir
+
+
+def test_load_ndjson_results_success():
     """Test loading NDJSON results from a valid file."""
-    ndjson_file = tmp_path / "results.jsonl"
+    test_dir = get_test_artifacts_dir()
+    ndjson_file = test_dir / "results.jsonl"
 
     # Create test data
     test_data = [
@@ -31,9 +40,10 @@ def test_load_ndjson_results_success(tmp_path):
     assert results[1]["name"] == "model2"
 
 
-def test_load_ndjson_results_file_not_found(tmp_path, capsys):
+def test_load_ndjson_results_file_not_found(capsys):
     """Test loading NDJSON results from non-existent file."""
-    non_existent_file = tmp_path / "does_not_exist.jsonl"
+    test_dir = get_test_artifacts_dir()
+    non_existent_file = test_dir / "does_not_exist.jsonl"
 
     results = load_ndjson_results(str(non_existent_file))
 
@@ -43,9 +53,10 @@ def test_load_ndjson_results_file_not_found(tmp_path, capsys):
     assert "not found" in captured.out
 
 
-def test_load_ndjson_results_invalid_json(tmp_path, capsys):
+def test_load_ndjson_results_invalid_json(capsys):
     """Test loading NDJSON results with invalid JSON."""
-    ndjson_file = tmp_path / "invalid.jsonl"
+    test_dir = get_test_artifacts_dir()
+    ndjson_file = test_dir / "invalid.jsonl"
 
     # Write invalid JSON
     with open(ndjson_file, "w") as f:
@@ -63,9 +74,10 @@ def test_load_ndjson_results_invalid_json(tmp_path, capsys):
     assert "Error parsing JSON:" in captured.out
 
 
-def test_load_ndjson_results_empty_lines(tmp_path):
+def test_load_ndjson_results_empty_lines():
     """Test loading NDJSON results with empty lines."""
-    ndjson_file = tmp_path / "with_empty_lines.jsonl"
+    test_dir = get_test_artifacts_dir()
+    ndjson_file = test_dir / "with_empty_lines.jsonl"
 
     # Write data with empty lines
     with open(ndjson_file, "w") as f:
@@ -82,9 +94,11 @@ def test_load_ndjson_results_empty_lines(tmp_path):
     assert results[1]["name"] == "model2"
 
 
-def test_generate_summary_from_file_success(tmp_path):
+def test_generate_summary_from_file_success():
     """Test generating summary from NDJSON file."""
-    ndjson_file = tmp_path / "results.jsonl"
+    test_dir = get_test_artifacts_dir()
+    ndjson_file = test_dir / "results.jsonl"
+    custom_summary = test_dir / "results_summary.txt"
 
     # Create test data with all required fields
     test_data = [
@@ -113,8 +127,8 @@ def test_generate_summary_from_file_success(tmp_path):
         for item in test_data:
             f.write(json.dumps(item) + "\n")
 
-    # Test generating summary
-    summary_file = generate_summary_from_file(str(ndjson_file))
+    # Test generating summary with explicit output path
+    summary_file = generate_summary_from_file(str(ndjson_file), str(custom_summary))
 
     # Check that summary file was created
     summary_path = Path(summary_file)
@@ -126,10 +140,11 @@ def test_generate_summary_from_file_success(tmp_path):
     assert "gpt2" in content
 
 
-def test_generate_summary_from_file_with_custom_output(tmp_path):
+def test_generate_summary_from_file_with_custom_output():
     """Test generating summary from NDJSON file with custom output filename."""
-    ndjson_file = tmp_path / "results.jsonl"
-    custom_summary = tmp_path / "custom_summary.txt"
+    test_dir = get_test_artifacts_dir()
+    ndjson_file = test_dir / "results.jsonl"
+    custom_summary = test_dir / "custom_summary.txt"
 
     # Create test data
     test_data = [
@@ -171,15 +186,17 @@ def test_generate_summary_from_file_with_custom_output(tmp_path):
     assert "bert-base-uncased" in content
 
 
-def test_generate_summary_from_file_empty_results(tmp_path):
+def test_generate_summary_from_file_empty_results():
     """Test generating summary from empty NDJSON file."""
-    ndjson_file = tmp_path / "empty_results.jsonl"
+    test_dir = get_test_artifacts_dir()
+    ndjson_file = test_dir / "empty_results.jsonl"
+    custom_summary = test_dir / "empty_results_summary.txt"
 
     # Create empty file
     ndjson_file.touch()
 
-    # Test generating summary
-    summary_file = generate_summary_from_file(str(ndjson_file))
+    # Test generating summary with explicit output path
+    summary_file = generate_summary_from_file(str(ndjson_file), str(custom_summary))
 
     # Check that summary file was created
     summary_path = Path(summary_file)
@@ -190,12 +207,14 @@ def test_generate_summary_from_file_empty_results(tmp_path):
     assert "🤖 ACME MODEL EVALUATION SUMMARY REPORT" in content
 
 
-def test_generate_summary_from_file_nonexistent_file(tmp_path):
+def test_generate_summary_from_file_nonexistent_file():
     """Test generating summary from non-existent NDJSON file."""
-    non_existent_file = tmp_path / "does_not_exist.jsonl"
+    test_dir = get_test_artifacts_dir()
+    non_existent_file = test_dir / "does_not_exist.jsonl"
+    custom_summary = test_dir / "does_not_exist_summary.txt"
 
-    # Test generating summary from non-existent file
-    summary_file = generate_summary_from_file(str(non_existent_file))
+    # Test generating summary from non-existent file with explicit output path
+    summary_file = generate_summary_from_file(str(non_existent_file), str(custom_summary))
 
     # Should still create summary file (though with empty results)
     summary_path = Path(summary_file)

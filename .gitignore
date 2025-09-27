@@ -36,3 +36,8 @@ acmecli.log
 *_summary.txt
 evaluation_*.jsonl
 test_analysis_*.jsonl
+
+# Test output directories
+test_artifacts/
+test_outputs/
+temp_test_files/

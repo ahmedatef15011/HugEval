@@ -21,11 +21,20 @@ Test Coverage Areas:
 
 import json
 import sys
+from pathlib import Path
 from typing import Iterable, Iterator
 
 import pytest
 
 from acmecli import main as app
+
+
+def get_test_artifacts_dir():
+    """Get the test artifacts directory path."""
+    project_root = Path(__file__).parent.parent
+    test_artifacts_dir = project_root / "test_artifacts"
+    test_artifacts_dir.mkdir(exist_ok=True)
+    return test_artifacts_dir
 
 
 class DummyPool:
@@ -102,7 +111,7 @@ def test_main_prints_ndjson_for_models(tmp_path, monkeypatch, capsys):
     assert 0.0 <= float(rec["net_score"]) <= 1.0
 
 
-def test_main_with_summary_flag(tmp_path, monkeypatch, capsys):
+def test_main_with_summary_flag(monkeypatch, capsys):
     """
     Validate summary report generation functionality for executive stakeholder communication.
 
@@ -117,8 +126,12 @@ def test_main_with_summary_flag(tmp_path, monkeypatch, capsys):
     - Executive-appropriate output formatting
     - Integration with the complete evaluation pipeline
     """
-    p = tmp_path / "urls.txt"
+    test_dir = get_test_artifacts_dir()
+    p = test_dir / "urls.txt"
     p.write_text("https://huggingface.co/gpt2\n")
+
+    # Change to test_artifacts directory to ensure files are created there
+    monkeypatch.chdir(test_dir)
 
     # Test with summary flag
     monkeypatch.setattr(sys, "argv", ["prog", str(p), "--summary"])
@@ -137,13 +150,18 @@ def test_main_with_summary_flag(tmp_path, monkeypatch, capsys):
     assert "View summary:" in out
 
 
-def test_main_with_custom_output(tmp_path, monkeypatch, capsys):
+def test_main_with_custom_output(monkeypatch, capsys):
     """Test main function with custom output filename."""
-    p = tmp_path / "urls.txt"
+    test_dir = get_test_artifacts_dir()
+    p = test_dir / "urls.txt"
     p.write_text("https://huggingface.co/gpt2\n")
 
-    # Test with custom output
-    monkeypatch.setattr(sys, "argv", ["prog", str(p), "--summary", "--output", "test_analysis"])
+    # Change to test_artifacts directory to ensure files are created there
+    monkeypatch.chdir(test_dir)
+
+    # Test with custom output using test_artifacts directory
+    output_path = test_dir / "test_analysis"
+    monkeypatch.setattr(sys, "argv", ["prog", str(p), "--summary", "--output", str(output_path)])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
 
     # Execute main application workflow - expect SystemExit(0) for successful processing
@@ -154,7 +172,7 @@ def test_main_with_custom_output(tmp_path, monkeypatch, capsys):
     assert exc_info.value.code == 0
 
     out = capsys.readouterr().out.strip()
-    assert "test_analysis" in out
+    assert str(output_path) in out
 
 
 def test_main_empty_file(tmp_path, monkeypatch, capsys):

@@ -96,6 +96,11 @@ acmecli/
     hf_api.py         # Metrics from Hugging Face API (stub for now)
 tests/
   test_smoke.py       # starter unit tests
+test_artifacts/        # Test-generated files (ignored by Git)
+  README.md           # Documentation of test artifacts
+  *.jsonl             # NDJSON test results and data files
+  *_summary.txt       # Generated summary reports from tests
+  urls.txt            # Test input files
 run                   # CLI shim (install, test, scoring)
 pyproject.toml        # deps + lint/test/type configs
 ```
@@ -156,6 +161,18 @@ NetScore = 0.20*License + 0.20*DatasetAndCode + 0.15*CodeQuality
 - Current tests: basic smoke tests for all metrics
 - Coverage target: **≥80%** before final delivery
 - Plan: expand with more unit + integration tests in Milestone 3
+
+### Test Artifacts Directory
+
+The `test_artifacts/` directory contains files generated during test execution:
+
+- **Purpose**: Stores all test-generated files to keep the project root clean
+- **Contents**: NDJSON test data, summary reports, evaluation results, and temporary test files
+- **Git Status**: Directory is ignored by Git (see `.gitignore`)
+- **Management**: Files persist after test runs for debugging purposes, can be safely deleted
+- **Organization**: Replaces previous behavior where test files were created in the project root
+
+This directory ensures a clean workspace while maintaining all test functionality and providing easy access to test-generated files for debugging.
 
 ---
 
