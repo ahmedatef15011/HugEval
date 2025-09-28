@@ -17,6 +17,7 @@ Contract: analyze_readme returns dict with keys
 - ease_of_use: float [0,1]
 - examples_present: bool
 """
+
 from __future__ import annotations
 
 import json
@@ -37,7 +38,9 @@ class LLMProvider(ABC):
 
 
 class PurdueGenAIProvider(LLMProvider):
-    def __init__(self, base_url: str, api_key: str, model: str, path: str = "/v1/chat/completions") -> None:
+    def __init__(
+        self, base_url: str, api_key: str, model: str, path: str = "/v1/chat/completions"
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
@@ -46,10 +49,11 @@ class PurdueGenAIProvider(LLMProvider):
     def analyze_readme(self, model_name: str, readme: str) -> Dict[str, Any]:
         """Call Purdue GenAI Studio REST API.
 
-        Assumed endpoint (example): POST {base_url}/v1/chat/completions
-        Headers: Authorization: Bearer <API_KEY>, Content-Type: application/json
-        Body: { model, messages: [{role:"user", content: prompt}], temperature: 0.0, max_tokens: 150 }
-        Adjust as needed for the actual Purdue API.
+            Assumed endpoint (example): POST {base_url}/v1/chat/completions
+            Headers: Authorization: Bearer <API_KEY>, Content-Type: application/json
+        Body: { model, messages: [{role:"user", content: prompt}], temperature: 0.0,
+        max_tokens: 150 }
+            Adjust as needed for the actual Purdue API.
         """
         prompt = (
             f"Analyze README for model '{model_name}'. Return JSON with keys: "
