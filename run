@@ -30,10 +30,14 @@ cmd="${1:-}"
 case "$cmd" in
   install)
     echo "Starting installation..." >&2
-    "${PIP_CMD[@]}" install --user -e '.[dev]' || {
-      echo "Installation failed with exit code $?" >&2
-      exit 1
-    }
+    # Try with --user first, fallback without --user if it fails
+    if ! "${PIP_CMD[@]}" install --user -e '.[dev]' 2>/dev/null; then
+      echo "Fallback: installing without --user flag..." >&2
+      "${PIP_CMD[@]}" install -e '.[dev]' || {
+        echo "Installation failed with exit code $?" >&2
+        exit 1
+      }
+    fi
     echo "Install complete."
     ;;
   test)
