@@ -19,7 +19,13 @@ detect_os() {
 }
 
 OS=$(detect_os)
-echo "Detected OS: $OS" >&2
+
+# Only show diagnostic output for install/test commands
+VERBOSE_MODE=false
+if [[ "${1:-}" == "install" ]] || [[ "${1:-}" == "test" ]]; then
+  VERBOSE_MODE=true
+  echo "Detected OS: $OS" >&2
+fi
 
 # --- pick a Python (platform-aware) ---
 find_python() {
@@ -50,7 +56,9 @@ find_python() {
 }
 
 if PY=$(find_python); then
-  echo "Found Python: $PY" >&2
+  if [[ "$VERBOSE_MODE" == "true" ]]; then
+    echo "Found Python: $PY" >&2
+  fi
 else
   echo "Error: Python not found. Please install Python 3.8+ and ensure it's in your PATH." >&2
   echo "  - Windows: Install from python.org or Microsoft Store" >&2
@@ -75,7 +83,9 @@ find_pip() {
 }
 
 if PIP_CMD=$(find_pip); then
-  echo "Found pip: $PIP_CMD" >&2
+  if [[ "$VERBOSE_MODE" == "true" ]]; then
+    echo "Found pip: $PIP_CMD" >&2
+  fi
 else
   echo "Error: pip not found for $PY." >&2
   echo "Please install pip:" >&2
