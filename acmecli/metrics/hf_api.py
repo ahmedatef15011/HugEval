@@ -20,6 +20,26 @@ logger = logging.getLogger(__name__)
 
 HF_API_BASE = "https://huggingface.co/api"
 
+# Module-level capture of last network-only elapsed times (ms) for API calls
+_last_net_ms_info: int = 0
+_last_net_ms_files: int = 0
+_last_net_ms_readme: int = 0
+
+
+def _elapsed_ms(resp: Any) -> int:
+    """Return network-only elapsed milliseconds from a requests response.
+
+    Tolerates mocked responses without an 'elapsed' attribute by returning 1ms.
+    """
+    try:
+        te = getattr(resp, "elapsed", None)
+        if te is None:
+            return 1
+        ts = te.total_seconds() if hasattr(te, "total_seconds") else float(te)
+        return int(max(1, ts * 1000))
+    except Exception:
+        return 1
+
 
 class ModelLookupError(RuntimeError):
     """Raised when a model cannot be fetched (not found, private, or other HTTP error)."""
@@ -64,6 +84,9 @@ def fetch_readme_content(model_id: str, token: Optional[str] = None) -> str:
             timeout=10,
             headers=_headers(token),
         )
+        # network-only latency
+        global _last_net_ms_readme
+        _last_net_ms_readme = _elapsed_ms(r) if r is not None else 1
         if r.status_code == 200:
             return r.text
         r = requests.get(
@@ -71,11 +94,13 @@ def fetch_readme_content(model_id: str, token: Optional[str] = None) -> str:
             timeout=10,
             headers=_headers(token),
         )
+        _last_net_ms_readme = _elapsed_ms(r) if r is not None else 1
         if r.status_code == 200:
             return r.text
         logger.info(f"No README found for {model_id} (last status {r.status_code})")
         return ""
     except requests.RequestException as e:
+        _last_net_ms_readme = 0
         logger.warning(f"Failed to fetch README for {model_id}: {e}")
         return ""
 
@@ -87,6 +112,9 @@ def fetch_model_info(model_id: str, token: Optional[str] = None) -> Dict[str, An
     url = f"{HF_API_BASE}/models/{model_id}"
     try:
         r = requests.get(url, timeout=10, headers=_headers(token))
+        # capture network-only
+        global _last_net_ms_info
+        _last_net_ms_info = _elapsed_ms(r) if r is not None else 1
         if r.status_code != 200:
             raise ModelLookupError(model_id, r.status_code, r.reason or "error")
         data = r.json()
@@ -94,6 +122,7 @@ def fetch_model_info(model_id: str, token: Optional[str] = None) -> Dict[str, An
             raise ModelLookupError(model_id, 500, "unexpected JSON payload")
         return data
     except requests.RequestException as e:
+        _last_net_ms_info = 0
         raise RuntimeError(f"network error contacting HF for {model_id}: {e}") from e
 
 
@@ -103,12 +132,15 @@ def fetch_model_files(model_id: str, token: Optional[str] = None) -> List[Dict[s
         r = requests.get(
             f"{HF_API_BASE}/models/{model_id}/tree/main", timeout=10, headers=_headers(token)
         )
+        global _last_net_ms_files
+        _last_net_ms_files = _elapsed_ms(r) if r is not None else 1
         if r.status_code == 200:
             data = r.json()
             return data if isinstance(data, list) else []
         logger.info(f"model files listing not available for {model_id}: HTTP {r.status_code}")
         return []
     except requests.RequestException as e:
+        _last_net_ms_files = 0
         logger.warning(f"Failed to fetch model files for {model_id}: {e}")
         return []
 
@@ -172,15 +204,13 @@ def build_context_from_api(url: str, token: Optional[str] = None) -> Dict[str, A
 
     lat: Dict[str, int] = {}
 
-    # Fetch core model metadata
-    t0 = time.perf_counter()
+    # Fetch core model metadata (network-only latency from response.elapsed)
     model_info = fetch_model_info(model_id, token=token)  # may raise ModelLookupError
-    lat_api_info = int((time.perf_counter() - t0) * 1000) or 1
+    lat_api_info = _last_net_ms_info or 1
 
-    # Fetch file listing
-    t0 = time.perf_counter()
+    # Fetch file listing (network-only)
     files_data = fetch_model_files(model_id, token=token)
-    lat_api_files = int((time.perf_counter() - t0) * 1000) or 1
+    lat_api_files = _last_net_ms_files or 1
 
     # Compute total size
     t0 = time.perf_counter()
@@ -197,10 +227,9 @@ def build_context_from_api(url: str, token: Optional[str] = None) -> Dict[str, A
 
     days_since_update = get_days_since_update(model_info)
 
-    # Readme fetch
-    t0 = time.perf_counter()
+    # Readme fetch (network-only)
     readme_content = fetch_readme_content(model_id, token=token)
-    lat_readme = int((time.perf_counter() - t0) * 1000) or 1
+    lat_readme = _last_net_ms_readme or 1
 
     # Heuristics and analysis
     t0 = time.perf_counter()
