@@ -83,22 +83,19 @@ def _validate_environment() -> None:
             # Network issues are not token validation failures
             pass
 
-    # Validate log file path if provided (must be writable; do not create directories)
+    # Validate log file path if provided. If invalid, fall back to default (no hard failure).
     log_file = os.getenv("LOG_FILE")
     if log_file:
-        log_dir = os.path.dirname(log_file) if os.path.dirname(log_file) else "."
-        if not os.path.exists(log_dir) or not os.path.isdir(log_dir):
-            print(f"Error: Invalid log file path: {log_file}", file=sys.stderr)
-            raise SystemExit(1)
-        if not os.access(log_dir, os.W_OK):
-            print(f"Error: Invalid log file path: {log_file}", file=sys.stderr)
-            raise SystemExit(1)
         try:
+            log_dir = os.path.dirname(log_file) if os.path.dirname(log_file) else "."
+            # If directory doesn't exist or is not writable, or open fails, fall back gracefully
+            if (log_dir and not os.path.isdir(log_dir)) or (log_dir and not os.access(log_dir, os.W_OK)):
+                raise OSError("unwritable or missing directory")
             with open(log_file, "a", encoding="utf-8"):
                 pass
-        except OSError as e:
-            print(f"Error: Invalid log file path: {log_file} ({e})", file=sys.stderr)
-            raise SystemExit(1)
+        except OSError:
+            # Fallback to default log file in CWD and continue
+            os.environ["LOG_FILE"] = "acmecli.log"
 
 
 def main() -> None:

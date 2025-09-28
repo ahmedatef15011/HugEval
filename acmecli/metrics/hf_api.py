@@ -208,34 +208,52 @@ def estimate_docs_quality(
 ) -> Dict[str, float]:
     from ..llm_analysis import analyze_readme_with_llm
 
-    downloads = model_info.get("downloads", 0)
-    likes = model_info.get("likes", 0)
-    popularity_score = min(1.0, (downloads / 10000) * 0.3 + (likes / 100) * 0.7)
+    downloads = int(model_info.get("downloads", 0) or 0)
+    likes = int(model_info.get("likes", 0) or 0)
+    # Use a smoother, log-based popularity metric to avoid saturating at 1.0 for popular models
+    import math as _math
+
+    d_term = (_math.log1p(max(0, downloads)) / _math.log1p(1_000_000)) if downloads else 0.0
+    l_term = (_math.log1p(max(0, likes)) / _math.log1p(50_000)) if likes else 0.0
+    popularity_score = max(0.0, min(1.0, 0.6 * d_term + 0.4 * l_term))
     base = {
-        "readme": min(1.0, 0.3 + popularity_score * 0.7),
-        "quickstart": popularity_score * 0.8,
-        "tutorials": popularity_score * 0.6,
-        "api_docs": popularity_score * 0.7,
-        "reproducibility": popularity_score * 0.5,
+        "readme": min(1.0, 0.35 + popularity_score * 0.55),
+        "quickstart": popularity_score * 0.7,
+        "tutorials": popularity_score * 0.5,
+        "api_docs": popularity_score * 0.6,
+        "reproducibility": popularity_score * 0.45,
     }
     if readme_content and model_id:
         try:
             llm = analyze_readme_with_llm(readme_content, model_id)
-            base["readme"] = base["readme"] * 0.6 + llm.get("documentation_quality", 0.0) * 0.4
+            base["readme"] = base["readme"] * 0.7 + llm.get("documentation_quality", 0.0) * 0.3
             if llm.get("installation_instructions", False):
-                base["quickstart"] = min(1.0, base["quickstart"] + 0.2)
+                base["quickstart"] = min(1.0, base["quickstart"] + 0.1)
             if llm.get("usage_examples", False):
-                base["tutorials"] = min(1.0, base["tutorials"] + 0.3)
+                base["tutorials"] = min(1.0, base["tutorials"] + 0.15)
             if llm.get("code_blocks_count", 0) >= 2:
-                base["api_docs"] = min(1.0, base["api_docs"] + 0.2)
+                base["api_docs"] = min(1.0, base["api_docs"] + 0.1)
         except Exception as e:
             logger.warning(f"LLM enhancement failed for {model_id}: {e}")
     return base
 
 
 def estimate_contributors(model_info: Dict[str, Any]) -> int:
-    d = model_info.get("downloads", 0)
-    return 8 if d > 100000 else 5 if d > 10000 else 3 if d > 1000 else 1
+    """Conservatively estimate active contributors from popularity signals.
+
+    Uses broad tiers based on downloads to avoid underestimating mature projects
+    while staying deterministic and data-driven.
+    """
+    d = int(model_info.get("downloads", 0) or 0)
+    if d > 1_000_000:
+        return 20
+    if d > 100_000:
+        return 10
+    if d > 10_000:
+        return 5
+    if d > 1_000:
+        return 3
+    return 1
 
 
 def estimate_dataset_presence(model_info: Dict[str, Any]) -> bool:
@@ -243,11 +261,13 @@ def estimate_dataset_presence(model_info: Dict[str, Any]) -> bool:
     if isinstance(tags, list):
         for tag in tags:
             if isinstance(tag, str) and any(
-                w in tag.lower() for w in ["dataset", "data", "training"]
+                w in tag.lower() for w in ["dataset", "datasets", "data", "training data"]
             ):
                 return True
-    d = model_info.get("downloads", 0)
-    return isinstance(d, int) and d > 1000
+    card = str(model_info.get("cardData", {})).lower()
+    if any(w in card for w in ["dataset", "training data", "pretraining data"]):
+        return True
+    return False
 
 
 def estimate_code_presence(model_info: Dict[str, Any]) -> bool:
@@ -255,8 +275,32 @@ def estimate_code_presence(model_info: Dict[str, Any]) -> bool:
 
 
 def estimate_dataset_docs(model_info: Dict[str, Any]) -> Dict[str, float]:
-    p = min(1.0, model_info.get("downloads", 0) / 10000)
-    return {"source": p * 0.8, "license": p * 0.9, "splits": p * 0.7, "ethics": p * 0.6}
+    """Infer dataset documentation quality from available metadata.
+
+    Prefer explicit signals in cardData; otherwise use a tempered popularity proxy
+    to avoid overstating dataset documentation for general models.
+    """
+    card = str(model_info.get("cardData", {})).lower()
+    def _sig(*words: str) -> float:
+        return 1.0 if any(w in card for w in words) else 0.2
+
+    # Signals if present
+    s_source = _sig("dataset", "data source", "corpus", "pretraining data")
+    s_license = _sig("dataset license", "data license", "license")
+    s_splits = _sig("train", "validation", "test split", "split")
+    s_ethics = _sig("bias", "ethical", "responsible", "safety")
+
+    # Popularity-based tempering (log-scale) as fallback influence
+    import math as _math
+    d = int(model_info.get("downloads", 0) or 0)
+    p = (_math.log1p(max(0, d)) / _math.log1p(1_000_000)) if d else 0.0
+    # Blend signals with popularity (majority weight to explicit signals)
+    return {
+        "source": min(1.0, 0.7 * s_source + 0.3 * p),
+        "license": min(1.0, 0.7 * s_license + 0.3 * p),
+        "splits": min(1.0, 0.6 * s_splits + 0.4 * p * 0.8),
+        "ethics": min(1.0, 0.5 * s_ethics + 0.5 * p * 0.6),
+    }
 
 
 def estimate_code_quality(model_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -270,8 +314,31 @@ def estimate_code_quality(model_info: Dict[str, Any]) -> Dict[str, Any]:
 
 def estimate_performance_claims(model_info: Dict[str, Any]) -> Dict[str, bool]:
     card = str(model_info.get("cardData", {})).lower()
-    has_bench = any(w in card for w in ["benchmark", "eval", "score", "accuracy", "bleu"])
-    has_cite = "citation" in card or model_info.get("downloads", 0) > 5000
+    bench_terms = [
+        "benchmark",
+        "eval",
+        "evaluation",
+        "score",
+        "accuracy",
+        "acc",
+        "f1",
+        "bleu",
+        "rouge",
+        "exact match",
+        "glue",
+        "squad",
+        "mnli",
+        "spearman",
+        "pearson",
+    ]
+    has_bench = any(t in card for t in bench_terms)
+    # Very popular models almost always have benchmarked claims publicly documented
+    if not has_bench:
+        d = int(model_info.get("downloads", 0) or 0)
+        l = int(model_info.get("likes", 0) or 0)
+        if d > 100_000 or l > 2_000:
+            has_bench = True
+    has_cite = ("citation" in card) or int(model_info.get("downloads", 0) or 0) > 5_000
     return {"benchmarks": has_bench, "citations": has_cite}
 
 
