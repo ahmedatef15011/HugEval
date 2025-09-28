@@ -21,6 +21,8 @@ import logging
 import os
 from typing import Any, Dict
 
+from .llm_providers import get_llm_provider
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,13 +46,26 @@ def analyze_readme_with_llm(readme_content: str, model_name: str) -> Dict[str, A
         Dict containing documentation quality metrics, ease of use scores,
         and boolean indicators for key documentation elements
     """
-    try:
-        # Attempt LLM-powered analysis first for enhanced accuracy
-        return _call_openai_api(readme_content, model_name)
-
-    except Exception as e:
-        logger.warning(f"LLM analysis failed for {model_name}: {e}")
-        return _analyze_readme_locally(readme_content, model_name)
+    # Use configured provider (Purdue). If none configured or it fails,
+    # fall back to deterministic local analysis unless LLM_STRICT is enabled.
+    provider = get_llm_provider()
+    strict_val = (os.getenv("LLM_STRICT", "0") or "0").strip().lower()
+    strict = strict_val in {"1", "true", "yes", "on"}
+    if provider is not None:
+        try:
+            result = provider.analyze_readme(model_name, readme_content)
+            # Merge provider result with local analysis for richer features
+            result.update(_analyze_readme_locally(readme_content, model_name))
+            return result
+        except Exception as e:
+            logger.warning(f"Configured LLM provider failed for {model_name}: {e}")
+            if strict:
+                raise
+    else:
+        logger.info("LLM provider not configured; using local analysis")
+        if strict:
+            raise RuntimeError("LLM provider not configured and LLM_STRICT is enabled")
+    return _analyze_readme_locally(readme_content, model_name)
 
 
 def _analyze_readme_locally(readme_content: str, model_name: str) -> Dict[str, Any]:
@@ -121,78 +136,8 @@ def _analyze_readme_locally(readme_content: str, model_name: str) -> Dict[str, A
 
 
 def _call_openai_api(readme_content: str, model_name: str) -> Dict[str, Any]:
-    """
-    Execute sophisticated README analysis using OpenAI's GPT models for enhanced accuracy.
-
-    This function leverages state-of-the-art language models to perform nuanced analysis
-    of documentation quality that goes beyond pattern matching. The LLM can understand
-    context, assess clarity, and evaluate practical usability in ways that traditional
-    text analysis cannot achieve.
-
-    The system uses carefully crafted prompts optimized for technical documentation
-    assessment and includes robust error handling with automatic fallback to local analysis.
-
-    Args:
-        readme_content: Documentation content for LLM analysis
-        model_name: Model identifier for contextual analysis
-
-    Returns:
-        Dict containing enhanced quality metrics and detailed assessment results
-    """
-    try:
-        import openai
-
-        # Verify API key availability for production deployment flexibility
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            logger.info("No OpenAI API key found, using local analysis")
-            return _analyze_readme_locally(readme_content, model_name)
-
-        client = openai.OpenAI(api_key=api_key)
-
-        # Carefully crafted prompt for optimal technical documentation analysis
-        prompt = f"""
-        Analyze this README for the machine learning model "{model_name}".
-
-        Rate the following aspects on a scale of 0.0 to 1.0:
-        1. Documentation quality (completeness, clarity)
-        2. Ease of use for new users (setup instructions, examples)
-        3. Presence of working examples
-
-        README content:
-        {readme_content[:2000]}...
-
-        Respond with ONLY a JSON object with keys: documentation_quality,
-        ease_of_use, examples_present (boolean)
-        """
-
-        # Configure API call for consistent, reliable results
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=150,
-            temperature=0.1,  # Low temperature for consistent analysis
-        )
-
-        # Parse and validate LLM response with error handling
-        import json
-
-        content = response.choices[0].message.content
-        if content is None:
-            logger.warning("OpenAI returned empty response, falling back to local analysis")
-            return _analyze_readme_locally(readme_content, model_name)
-
-        result: dict[str, Any] = json.loads(content)
-
-        # Combine LLM insights with comprehensive local analysis for complete assessment
-        result.update(_analyze_readme_locally(readme_content, model_name))
-
-        logger.info(f"LLM analysis completed for {model_name}")
-        return result
-
-    except Exception as e:
-        logger.warning(f"OpenAI API call failed: {e}")
-        return _analyze_readme_locally(readme_content, model_name)
+    """Shim kept for test compatibility; now always uses local analysis."""
+    return _analyze_readme_locally(readme_content, model_name)
 
 
 def enhance_ramp_up_time_with_llm(base_score: float, readme_content: str, model_name: str) -> float:
