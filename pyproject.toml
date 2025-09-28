@@ -46,9 +46,14 @@ show_missing = true
 
 # ---- mypy ----
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.12"
 warn_unused_ignores = true
 strict = true
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = ["numpy", "torch", "torch.*"]
+ignore_missing_imports = true
 
 # ---- pytest ----
 [tool.pytest.ini_options]
