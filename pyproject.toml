@@ -51,4 +51,8 @@ warn_unused_ignores = true
 strict = true
 
 # ---- pytest ----
-# Pytest configuration intentionally minimal to maximize compatibility with autograders.
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["."]
+import-mode = "importlib"
