@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -169,15 +170,78 @@ def build_context_from_api(url: str, token: Optional[str] = None) -> Dict[str, A
     model_id = extract_model_id(url)
     logger.info(f"Fetching data for model: {model_id}")
 
-    model_info = fetch_model_info(model_id, token=token)  # may raise ModelLookupError
-    files_data = fetch_model_files(model_id, token=token)
-    total_bytes = calculate_model_size(files_data) if files_data else 50_000_000
+    lat: Dict[str, int] = {}
 
+    # Fetch core model metadata
+    t0 = time.perf_counter()
+    model_info = fetch_model_info(model_id, token=token)  # may raise ModelLookupError
+    lat_api_info = int((time.perf_counter() - t0) * 1000) or 1
+
+    # Fetch file listing
+    t0 = time.perf_counter()
+    files_data = fetch_model_files(model_id, token=token)
+    lat_api_files = int((time.perf_counter() - t0) * 1000) or 1
+
+    # Compute total size
+    t0 = time.perf_counter()
+    total_bytes = calculate_model_size(files_data) if files_data else 50_000_000
+    lat_size_calc = int((time.perf_counter() - t0) * 1000) or 1
+
+    # Extract simple fields
     downloads = get_model_downloads(model_info)
     likes = get_model_likes(model_info)
+
+    t0 = time.perf_counter()
     license_text = get_model_license(model_info)
+    lat_license_parse = int((time.perf_counter() - t0) * 1000) or 1
+
     days_since_update = get_days_since_update(model_info)
+
+    # Readme fetch
+    t0 = time.perf_counter()
     readme_content = fetch_readme_content(model_id, token=token)
+    lat_readme = int((time.perf_counter() - t0) * 1000) or 1
+
+    # Heuristics and analysis
+    t0 = time.perf_counter()
+    docs = estimate_docs_quality(model_info, readme_content, model_id)
+    lat_docs = int((time.perf_counter() - t0) * 1000) or 1
+
+    t0 = time.perf_counter()
+    contributors = estimate_contributors(model_info)
+    lat_contrib = int((time.perf_counter() - t0) * 1000) or 1
+
+    t0 = time.perf_counter()
+    dataset_present = estimate_dataset_presence(model_info)
+    lat_dataset_presence = int((time.perf_counter() - t0) * 1000) or 1
+
+    t0 = time.perf_counter()
+    code_present = estimate_code_presence(model_info)
+    lat_code_presence = int((time.perf_counter() - t0) * 1000) or 1
+
+    t0 = time.perf_counter()
+    dataset_doc = estimate_dataset_docs(model_info)
+    lat_dataset_docs = int((time.perf_counter() - t0) * 1000) or 1
+
+    t0 = time.perf_counter()
+    cq_vals = estimate_code_quality(model_info)
+    lat_code_quality = int((time.perf_counter() - t0) * 1000) or 1
+
+    t0 = time.perf_counter()
+    perf = estimate_performance_claims(model_info)
+    lat_perf = int((time.perf_counter() - t0) * 1000) or 1
+
+    # Attach per-metric outward latencies (including API/IO where relevant)
+    lat = {
+        "size_score_latency": lat_api_files + lat_size_calc,
+        "license_latency": lat_api_info + lat_license_parse,
+        "ramp_up_time_latency": lat_readme + lat_docs,
+        "bus_factor_latency": lat_api_info + lat_contrib,
+        "dataset_and_code_score_latency": lat_api_info + lat_dataset_presence + lat_code_presence,
+        "dataset_quality_latency": lat_api_info + lat_dataset_docs,
+        "code_quality_latency": lat_api_info + lat_code_quality,
+        "performance_claims_latency": lat_api_info + lat_perf + lat_readme,
+    }
 
     context = {
         "total_bytes": total_bytes,
@@ -185,16 +249,17 @@ def build_context_from_api(url: str, token: Optional[str] = None) -> Dict[str, A
         "downloads": downloads,
         "likes": likes,
         "days_since_update": days_since_update,
-        "docs": estimate_docs_quality(model_info, readme_content, model_id),
+        "docs": docs,
         "readme_content": readme_content,
-        "contributors": estimate_contributors(model_info),
-        "dataset_present": estimate_dataset_presence(model_info),
-        "code_present": estimate_code_presence(model_info),
-        "dataset_doc": estimate_dataset_docs(model_info),
-        "flake8_errors": estimate_code_quality(model_info)["flake8_errors"],
-        "isort_sorted": estimate_code_quality(model_info)["isort_sorted"],
-        "mypy_errors": estimate_code_quality(model_info)["mypy_errors"],
-        "perf": estimate_performance_claims(model_info),
+        "contributors": contributors,
+        "dataset_present": dataset_present,
+        "code_present": code_present,
+        "dataset_doc": dataset_doc,
+        "flake8_errors": cq_vals["flake8_errors"],
+        "isort_sorted": cq_vals["isort_sorted"],
+        "mypy_errors": cq_vals["mypy_errors"],
+        "perf": perf,
+        "latencies": lat,
     }
     logger.info(f"Successfully built context for {model_id}")
     return context

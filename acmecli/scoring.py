@@ -17,6 +17,7 @@ monitoring in production environments.
 from __future__ import annotations
 
 import math
+import time
 from typing import Any, Dict
 
 from .metrics.repo_scan import (
@@ -99,7 +100,11 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
         Dict containing individual scores, latencies, and composite net_score
         representing overall model trustworthiness and deployment readiness
     """
-    # Repository analysis metrics with performance timing
+    t_start = time.perf_counter()
+
+    # Repository analysis metrics with performance timing (computation only)
+    # Outward I/O, parsing, and preprocessing latencies are provided via
+    # ctx['latencies'] when available
     size, size_ms = size_score(ctx.get("total_bytes", 0))
     lic, lic_ms = license_score(ctx.get("license_text", ""))
 
@@ -118,7 +123,8 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     # Reproducibility and transparency scoring
     dac, dac_ms = dataset_and_code_score(
-        ctx.get("dataset_present", False), ctx.get("code_present", False)
+        ctx.get("dataset_present", False),
+        ctx.get("code_present", False),
     )
 
     # Data provenance and documentation quality
@@ -129,7 +135,9 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     # Software engineering best practices assessment
     cq, cq_ms = code_quality_score(
-        ctx.get("flake8_errors", 0), ctx.get("isort_sorted", True), ctx.get("mypy_errors", 0)
+        ctx.get("flake8_errors", 0),
+        ctx.get("isort_sorted", True),
+        ctx.get("mypy_errors", 0),
     )
 
     # Performance validation and benchmarking rigor
@@ -149,7 +157,10 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     # Performance monitoring data for system optimization
-    latencies = {
+    # Prefer outward latencies from context (includes API/IO/parsing);
+    # fallback to local compute timings
+    latencies_ctx = ctx.get("latencies", {}) or {}
+    latencies_default = {
         "size_score_latency": size_ms,
         "license_latency": lic_ms,
         "ramp_up_time_latency": ramp_ms,
@@ -159,6 +170,10 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "code_quality_latency": cq_ms,
         "performance_claims_latency": pc_ms,
     }
+    # Merge with preference for ctx-provided values and ensure each is at least 1ms
+    latencies = {
+        k: int(max(1, int(latencies_ctx.get(k, latencies_default[k])))) for k in latencies_default
+    }
 
     # Device-specific deployment compatibility using deterministic curve by total_bytes
     size_obj = _device_size_scores(ctx.get("total_bytes", 0))
@@ -166,8 +181,12 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
     # Calculate weighted composite score representing overall model trustworthiness
     # Compute weighted net score
     net = sum(scores[k] * DEFAULT_WEIGHTS[k] for k in DEFAULT_WEIGHTS)
-    # Report end-to-end latency as the sum of individual metric latencies
-    net_latency = int(sum(latencies.values()))
+    # Compute orchestration overhead and report end-to-end latency as
+    # the slowest metric latency plus coordinator overhead (parallel semantics)
+    elapsed_ms = int((time.perf_counter() - t_start) * 1000)
+    max_metric = max(latencies.values()) if latencies else 1
+    overhead = max(1, elapsed_ms)
+    net_latency = max_metric + overhead
 
     # Comprehensive results package for API consumers and business reporting
     result = {
