@@ -83,25 +83,32 @@ def _validate_environment() -> None:
             # Network issues are not token validation failures
             pass
 
-    # Validate log file path if provided
+    # Validate log file path if provided (must be writable; do not create directories)
     log_file = os.getenv("LOG_FILE")
     if log_file:
-        # Check if directory exists and is writable
         log_dir = os.path.dirname(log_file) if os.path.dirname(log_file) else "."
-        if not os.path.exists(log_dir):
-            print(f"Error: Log file directory does not exist: {log_dir}", file=sys.stderr)
+        if not os.path.exists(log_dir) or not os.path.isdir(log_dir):
+            print(f"Error: Invalid log file path: {log_file}", file=sys.stderr)
             raise SystemExit(1)
         if not os.access(log_dir, os.W_OK):
-            print(f"Error: Log file directory is not writable: {log_dir}", file=sys.stderr)
+            print(f"Error: Invalid log file path: {log_file}", file=sys.stderr)
+            raise SystemExit(1)
+        try:
+            with open(log_file, "a", encoding="utf-8"):
+                pass
+        except OSError as e:
+            print(f"Error: Invalid log file path: {log_file} ({e})", file=sys.stderr)
             raise SystemExit(1)
 
 
 def main() -> None:
     args = parse_args()
-    setup_logging()
 
-    # Validate environment configuration
+    # Validate environment configuration first (ensures LOG_FILE path is usable)
     _validate_environment()
+
+    # Configure logging after validation
+    setup_logging()
 
     # Usage/config errors -> exit 1 (per autograder requirement)
     if not args.url_file:

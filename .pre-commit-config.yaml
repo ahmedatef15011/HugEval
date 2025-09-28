@@ -26,6 +26,6 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: bash -lc 'PYTHONPATH=. pytest tests/ -q'
+        entry: pytest tests/ -q
         language: system
         types: [python]
