@@ -84,6 +84,7 @@ def timed(fn: Callable[..., float]) -> Callable[..., Tuple[float, int]]:
     Returns:
         Callable: Wrapped function returning (normalized_score, actual_execution_time_ms)
     """
+
     def wrapper(*args: Any, **kwargs: Any) -> Tuple[float, int]:
         # High-precision timing for accurate performance measurement
         t0 = time.perf_counter()
