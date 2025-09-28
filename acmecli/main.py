@@ -89,7 +89,9 @@ def _validate_environment() -> None:
         try:
             log_dir = os.path.dirname(log_file) if os.path.dirname(log_file) else "."
             # If directory doesn't exist or is not writable, or open fails, fall back gracefully
-            if (log_dir and not os.path.isdir(log_dir)) or (log_dir and not os.access(log_dir, os.W_OK)):
+            if (log_dir and not os.path.isdir(log_dir)) or (
+                log_dir and not os.access(log_dir, os.W_OK)
+            ):
                 raise OSError("unwritable or missing directory")
             with open(log_file, "a", encoding="utf-8"):
                 pass

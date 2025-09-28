@@ -281,6 +281,7 @@ def estimate_dataset_docs(model_info: Dict[str, Any]) -> Dict[str, float]:
     to avoid overstating dataset documentation for general models.
     """
     card = str(model_info.get("cardData", {})).lower()
+
     def _sig(*words: str) -> float:
         return 1.0 if any(w in card for w in words) else 0.2
 
@@ -292,6 +293,7 @@ def estimate_dataset_docs(model_info: Dict[str, Any]) -> Dict[str, float]:
 
     # Popularity-based tempering (log-scale) as fallback influence
     import math as _math
+
     d = int(model_info.get("downloads", 0) or 0)
     p = (_math.log1p(max(0, d)) / _math.log1p(1_000_000)) if d else 0.0
     # Blend signals with popularity (majority weight to explicit signals)
@@ -335,8 +337,8 @@ def estimate_performance_claims(model_info: Dict[str, Any]) -> Dict[str, bool]:
     # Very popular models almost always have benchmarked claims publicly documented
     if not has_bench:
         d = int(model_info.get("downloads", 0) or 0)
-        l = int(model_info.get("likes", 0) or 0)
-        if d > 100_000 or l > 2_000:
+        likes_count = int(model_info.get("likes", 0) or 0)
+        if d > 100_000 or likes_count > 2_000:
             has_bench = True
     has_cite = ("citation" in card) or int(model_info.get("downloads", 0) or 0) > 5_000
     return {"benchmarks": has_bench, "citations": has_cite}
