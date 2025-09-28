@@ -70,10 +70,40 @@ def license_score(license_text: str) -> float:
     """
     if not license_text:
         return 0.5  # Unknown license requires legal assessment
-    tex = license_text.lower()
-    if "lgpl-2.1" in tex or "lgpl v2.1" in tex or "gnu lesser general public license v2.1" in tex:
-        return 1.0  # Full compliance with target license
-    return 0.0  # Non-compliant license blocks deployment
+    tex = license_text.lower().strip()
+
+    # Common OSI permissive and weak copyleft licenses acceptable for commercial use
+    ok_tokens = (
+        "lgpl-2.1",
+        "lgpl v2.1",
+        "gnu lesser general public license v2.1",
+        "apache-2.0",
+        "apache 2.0",
+        "mit",
+        "bsd-2",
+        "bsd-3",
+        "bsd 2",
+        "bsd 3",
+        "mpl-2.0",
+        "mpl 2.0",
+        "cc-by-4.0",  # for datasets/models allowing attribution
+        "unlicense",
+    )
+    if any(tok in tex for tok in ok_tokens):
+        return 1.0
+
+    # Strong copyleft (e.g., GPL-3.0-only) typically incompatible for proprietary use
+    bad_tokens = (
+        "gpl-3.0",
+        "gpl v3",
+        "gnu general public license v3",
+        "agpl",
+    )
+    if any(tok in tex for tok in bad_tokens):
+        return 0.0
+
+    # Ambiguous or custom licenses – require review
+    return 0.5
 
 
 @timed

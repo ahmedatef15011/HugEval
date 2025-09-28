@@ -16,6 +16,7 @@ monitoring in production environments.
 
 from __future__ import annotations
 
+import math
 import time
 from typing import Any, Dict
 
@@ -52,6 +53,35 @@ def clamp01(x: float) -> float:
     and ensuring reliable composite score calculations.
     """
     return max(0.0, min(1.0, float(x)))
+
+
+def _device_size_scores(total_bytes: int) -> Dict[str, float]:
+    """
+    Deterministic, device-aware size efficiency mapping based solely on model size.
+
+    Uses a smooth, capacity-based curve per device: score = 1 / (1 + (S/C)^a)
+    - S: model size in bytes
+    - C: device capacity constant (in bytes)
+    - a: sharpness factor controlling how fast the score falls as size grows
+
+    Chosen to yield intuitive behavior without hard-coding any model-specific values:
+    - Small models (< C) score close to 1.0
+    - Models around C are ~0.5
+    - Larger models decay smoothly toward 0.0
+    """
+    S = max(0.0, float(total_bytes))
+    params = {
+        "raspberry_pi": (150_000_000.0, 1.5),  # ~150MB capacity with steeper decay
+        "jetson_nano": (300_000_000.0, 1.5),  # ~300MB capacity
+        "desktop_pc": (2_000_000_000.0, 2.0),  # ~2GB capacity, very forgiving
+        "aws_server": (4_000_000_000.0, 2.0),  # ~4GB capacity
+    }
+    out: Dict[str, float] = {}
+    for device, (C, a) in params.items():
+        ratio = (S / C) if C > 0 else 0.0
+        score = 1.0 / (1.0 + math.pow(max(0.0, ratio), a))
+        out[device] = clamp01(score)
+    return out
 
 
 def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -131,23 +161,15 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "performance_claims_latency": pc_ms,
     }
 
-    # Device-specific deployment compatibility matrix
-    # Currently unified across platforms - can be enhanced for device-specific optimization
-    size_obj = {
-        "raspberry_pi": scores["size"],
-        "jetson_nano": scores["size"],
-        "desktop_pc": scores["size"],
-        "aws_server": scores["size"],
-    }
+    # Device-specific deployment compatibility using deterministic curve by total_bytes
+    size_obj = _device_size_scores(ctx.get("total_bytes", 0))
 
     # Calculate weighted composite score representing overall model trustworthiness
-    import random
-
     t0 = time.perf_counter()
     net = sum(scores[k] * DEFAULT_WEIGHTS[k] for k in DEFAULT_WEIGHTS)
     actual_latency = int((time.perf_counter() - t0) * 1000)
-    # Use realistic latency simulation for net score aggregation
-    net_latency = max(actual_latency, random.randint(100, 200))
+    # Deterministic latency (measured only) to satisfy "no randomness"
+    net_latency = max(0, actual_latency)
 
     # Comprehensive results package for API consumers and business reporting
     result = {
