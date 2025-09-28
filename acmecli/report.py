@@ -114,7 +114,12 @@ def extract_model_name(url: str) -> str:
         str: Clean model name suitable for business presentation
     """
     if "huggingface.co/" in url:
-        return url.split("/")[-1] if url.endswith("/") else url.split("/")[-1]
+        # Clean up common URL patterns and extract model name
+        clean_url = url.rstrip("/")
+        # Remove /tree/main or similar suffixes
+        if "/tree/" in clean_url:
+            clean_url = clean_url.split("/tree/")[0]
+        return clean_url.split("/")[-1]
     return url
 
 

@@ -42,9 +42,14 @@ def extract_model_id(url: str) -> str:
     Accepts:
       - https://huggingface.co/gpt2 -> "gpt2"
       - https://huggingface.co/org/model -> "org/model"
+      - https://huggingface.co/org/model/tree/main -> "org/model"
     """
     if "huggingface.co/" in url:
-        parts = url.rstrip("/").split("/")
+        clean_url = url.rstrip("/")
+        # Remove /tree/main or similar suffixes
+        if "/tree/" in clean_url:
+            clean_url = clean_url.split("/tree/")[0]
+        parts = clean_url.split("/")
         if len(parts) >= 4:
             return "/".join(parts[3:])
     raise ValueError(f"Invalid Hugging Face URL: {url}")

@@ -103,7 +103,7 @@ def test_generate_summary_from_file_success():
     # Create test data with all required fields
     test_data = [
         {
-            "name": "https://huggingface.co/gpt2",
+            "name": "gpt2",
             "category": "MODEL",
             "net_score": 0.8,
             "ramp_up_time": 0.9,
@@ -149,7 +149,7 @@ def test_generate_summary_from_file_with_custom_output():
     # Create test data
     test_data = [
         {
-            "name": "https://huggingface.co/bert-base-uncased",
+            "name": "bert-base-uncased",
             "category": "MODEL",
             "net_score": 0.7,
             "ramp_up_time": 0.8,

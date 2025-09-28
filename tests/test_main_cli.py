@@ -106,7 +106,7 @@ def test_main_prints_ndjson_for_models(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out.strip().splitlines()
     assert len(out) == 1  # Only model URL should generate output
     rec = json.loads(out[0])
-    assert rec["name"] == "https://huggingface.co/gpt2"
+    assert rec["name"] == "gpt2"  # Expect extracted model name, not full URL
     assert rec["category"] == "MODEL"
     # Verify score normalization and range compliance
     assert 0.0 <= float(rec["net_score"]) <= 1.0

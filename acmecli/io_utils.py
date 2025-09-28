@@ -24,16 +24,20 @@ def read_urls(path: str) -> Iterable[str]:
     Essential for batch evaluation workflows and continuous integration pipelines.
 
     Args:
-        path: File path containing newline-separated URLs
+        path: File path containing newline-separated URLs or comma-separated URLs
 
     Yields:
         str: Clean, validated URLs ready for processing
     """
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            s = line.strip()
-            if s:
-                yield s
+            line = line.strip()
+            if line:
+                # Handle comma-separated URLs on the same line
+                for url in line.split(","):
+                    url = url.strip()
+                    if url:  # Skip empty URLs after splitting
+                        yield url
 
 
 def write_ndjson_line(d: Dict[str, Any]) -> None:

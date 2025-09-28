@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Tuple
 from .io_utils import read_urls, write_ndjson_line
 from .logging_cfg import setup_logging
 from .metrics.hf_api import ModelLookupError, build_context_from_api
-from .report import capture_and_summarize_results
+from .report import capture_and_summarize_results, extract_model_name
 from .scoring import compute_all_scores
 from .urls import Category, classify
 
@@ -50,7 +50,8 @@ def process_model(url: str) -> Dict[str, Any]:
     # May raise ModelLookupError
     ctx = build_ctx_from_url(url)
     fields = compute_all_scores(ctx)
-    return {"name": url, "category": "MODEL", **fields}
+    model_name = extract_model_name(url)
+    return {"name": model_name, "category": "MODEL", **fields}
 
 
 def _write_error_line(path: str, record: Dict[str, Any]) -> None:

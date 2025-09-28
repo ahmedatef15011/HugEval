@@ -45,7 +45,7 @@ def test_parse_model_results_single_model():
     """Test parsing single model result."""
     models = [
         {
-            "name": "https://huggingface.co/gpt2",
+            "name": "gpt2",
             "net_score": 0.75,
             "license": 0.5,
             "size_score": {"raspberry_pi": 0.8, "desktop_pc": 1.0},
@@ -67,19 +67,19 @@ def test_parse_model_results_multiple_models():
     """Test parsing multiple models with different scores."""
     models = [
         {
-            "name": "https://huggingface.co/gpt2",
+            "name": "gpt2",
             "net_score": 0.85,  # Excellent
             "license": 1.0,  # Compliant
             "size_score": {"raspberry_pi": 0.6, "desktop_pc": 1.0},
         },
         {
-            "name": "https://huggingface.co/bert",
+            "name": "bert",
             "net_score": 0.45,  # Acceptable
             "license": 0.0,  # Non-compliant
             "size_score": {"raspberry_pi": 0.4, "desktop_pc": 0.8},
         },
         {
-            "name": "https://huggingface.co/distilbert",
+            "name": "distilbert",
             "net_score": 0.25,  # Poor
             "license": 0.5,  # Non-compliant
             "size_score": {"raspberry_pi": 0.9, "desktop_pc": 1.0},
@@ -102,7 +102,7 @@ def test_generate_summary_report():
     """Test summary report generation."""
     models = [
         {
-            "name": "https://huggingface.co/gpt2",
+            "name": "gpt2",
             "net_score": 0.75,
             "license": 0.5,
             "size_score": {"raspberry_pi": 0.8, "desktop_pc": 1.0},
