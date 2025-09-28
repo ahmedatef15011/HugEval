@@ -169,7 +169,7 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
     net = sum(scores[k] * DEFAULT_WEIGHTS[k] for k in DEFAULT_WEIGHTS)
     actual_latency = int((time.perf_counter() - t0) * 1000)
     # Deterministic latency (measured only) to satisfy "no randomness"
-    net_latency = max(0, actual_latency)
+    net_latency = max(1, actual_latency)
 
     # Comprehensive results package for API consumers and business reporting
     result = {

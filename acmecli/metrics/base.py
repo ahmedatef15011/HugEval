@@ -92,7 +92,7 @@ def timed(fn: Callable[..., float]) -> Callable[..., Tuple[float, int]]:
         score = float(fn(*args, **kwargs))
         dt_ms = int((time.perf_counter() - t0) * 1000)
 
-        # Enforce score normalization and ensure non-negative latency
-        return max(0.0, min(1.0, score)), max(0, dt_ms)
+        # Enforce score normalization and ensure latency >= 1ms (avoid zero in fast runs)
+        return max(0.0, min(1.0, score)), max(1, dt_ms)
 
     return wrapper

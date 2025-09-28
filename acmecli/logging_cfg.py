@@ -44,10 +44,13 @@ def setup_logging() -> None:
     # Ensure the directory for the log file exists (create if missing)
     try:
         log_path = Path(path)
+        # If LOG_FILE points to an existing directory, reject it and fall back
+        if log_path.exists() and log_path.is_dir():
+            raise ValueError("LOG_FILE points to a directory, not a file")
         log_dir = log_path.parent if str(log_path.parent) != "" else Path(".")
         log_dir.mkdir(parents=True, exist_ok=True)
     except Exception:
-        # If directory creation fails, fall back to current directory log file name
+        # If path is invalid or directory creation fails, fall back to default file in CWD
         path = "acmecli.log"
 
     # Production-ready logging format for monitoring and analysis
