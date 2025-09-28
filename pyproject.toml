@@ -49,6 +49,3 @@ show_missing = true
 python_version = "3.8"
 warn_unused_ignores = true
 strict = true
-
-# ---- pytest ----
-# Pytest configuration intentionally minimal to maximize compatibility with autograders.
