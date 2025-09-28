@@ -17,7 +17,6 @@ monitoring in production environments.
 from __future__ import annotations
 
 import math
-import time
 from typing import Any, Dict
 
 from .metrics.repo_scan import (
@@ -165,12 +164,10 @@ def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
     size_obj = _device_size_scores(ctx.get("total_bytes", 0))
 
     # Calculate weighted composite score representing overall model trustworthiness
-    t0 = time.perf_counter()
+    # Compute weighted net score
     net = sum(scores[k] * DEFAULT_WEIGHTS[k] for k in DEFAULT_WEIGHTS)
-    actual_latency = int((time.perf_counter() - t0) * 1000)
-    # Deterministic net latency derived from component latencies, clamped to [100,200]
-    sum_component_ms = int(sum(latencies.values()))
-    net_latency = min(200, max(100, max(1, actual_latency) + sum_component_ms))
+    # Report end-to-end latency as the sum of individual metric latencies
+    net_latency = int(sum(latencies.values()))
 
     # Comprehensive results package for API consumers and business reporting
     result = {
