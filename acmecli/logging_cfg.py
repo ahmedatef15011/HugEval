@@ -12,6 +12,7 @@ as part of automated CI/CD pipelines or scheduled batch jobs.
 
 import logging
 import os
+from pathlib import Path
 
 
 def setup_logging() -> None:
@@ -40,7 +41,19 @@ def setup_logging() -> None:
     lvl = level_map.get(os.getenv("LOG_LEVEL", "0"), logging.CRITICAL + 1)
     path = os.getenv("LOG_FILE", "acmecli.log")
 
+    # Ensure the directory for the log file exists (create if missing)
+    try:
+        log_path = Path(path)
+        log_dir = log_path.parent if str(log_path.parent) != "" else Path(".")
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # If directory creation fails, fall back to current directory log file name
+        path = "acmecli.log"
+
     # Production-ready logging format for monitoring and analysis
     logging.basicConfig(
-        filename=path, level=lvl, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+        filename=path,
+        level=lvl,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
     )

@@ -49,3 +49,10 @@ show_missing = true
 python_version = "3.8"
 warn_unused_ignores = true
 strict = true
+
+# ---- pytest ----
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["."]
+import-mode = "importlib"
