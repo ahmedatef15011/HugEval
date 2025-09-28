@@ -51,7 +51,14 @@ def analyze_readme_with_llm(readme_content: str, model_name: str) -> Dict[str, A
     provider = get_llm_provider()
     strict_val = (os.getenv("LLM_STRICT", "0") or "0").strip().lower()
     strict = strict_val in {"1", "true", "yes", "on"}
-    if provider is not None:
+    # In deterministic mode, avoid external LLM to keep scores stable
+    deterministic = (os.getenv("DETERMINISTIC", "0") or "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if provider is not None and not deterministic:
         try:
             result = provider.analyze_readme(model_name, readme_content)
             # Merge provider result with local analysis for richer features

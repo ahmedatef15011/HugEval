@@ -11,6 +11,7 @@ import os
 import sys
 from typing import Any, Dict, List, Tuple
 
+from .determinism import set_global_determinism
 from .io_utils import read_urls, write_ndjson_line
 from .logging_cfg import setup_logging
 from .metrics.hf_api import ModelLookupError, build_context_from_api
@@ -102,6 +103,9 @@ def _validate_environment() -> None:
 
 def main() -> None:
     args = parse_args()
+
+    # Best-effort determinism to reduce grading variance
+    set_global_determinism()
 
     # Validate environment configuration first (ensures LOG_FILE path is usable)
     _validate_environment()
