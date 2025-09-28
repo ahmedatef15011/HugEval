@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures as cf
 import json
+import os
 import sys
 from typing import Any, Dict, List, Tuple
 
@@ -59,9 +60,48 @@ def _write_error_line(path: str, record: Dict[str, Any]) -> None:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def _validate_environment() -> None:
+    """Validate environment configuration."""
+    import requests
+
+    # Validate GitHub token if provided
+    token = os.getenv("GITHUB_TOKEN")
+    if token:
+        # Simple validation - check if token format is reasonable
+        if not token.startswith(("ghp_", "github_pat_")) or len(token) < 20:
+            print("Error: Invalid GitHub token format", file=sys.stderr)
+            raise SystemExit(1)
+
+        # Test token with a simple API call
+        try:
+            headers = {"Authorization": f"Bearer {token}", "User-Agent": "ACME-CLI/0.1.0"}
+            response = requests.get("https://api.github.com/user", headers=headers, timeout=10)
+            if response.status_code == 401:
+                print("Error: Invalid GitHub token - authentication failed", file=sys.stderr)
+                raise SystemExit(1)
+        except requests.RequestException:
+            # Network issues are not token validation failures
+            pass
+
+    # Validate log file path if provided
+    log_file = os.getenv("LOG_FILE")
+    if log_file:
+        # Check if directory exists and is writable
+        log_dir = os.path.dirname(log_file) if os.path.dirname(log_file) else "."
+        if not os.path.exists(log_dir):
+            print(f"Error: Log file directory does not exist: {log_dir}", file=sys.stderr)
+            raise SystemExit(1)
+        if not os.access(log_dir, os.W_OK):
+            print(f"Error: Log file directory is not writable: {log_dir}", file=sys.stderr)
+            raise SystemExit(1)
+
+
 def main() -> None:
     args = parse_args()
     setup_logging()
+
+    # Validate environment configuration
+    _validate_environment()
 
     # Usage/config errors -> exit 1 (per autograder requirement)
     if not args.url_file:
