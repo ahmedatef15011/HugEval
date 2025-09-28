@@ -30,7 +30,7 @@ cmd="${1:-}"
 case "$cmd" in
   install)
     echo "Starting installation..." >&2
-    "${PIP_CMD[@]}" install -e '.[dev]' || {
+    "${PIP_CMD[@]}" install --user -e '.[dev]' || {
       echo "Installation failed with exit code $?" >&2
       exit 1
     }

@@ -94,12 +94,13 @@ def test_main_prints_ndjson_for_models(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["prog", str(p)])
     monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
 
-    # Execute main application workflow - expect SystemExit(1) due to invalid URLs
+    # Execute main application workflow - expect SystemExit(0) when models succeed
     with pytest.raises(SystemExit) as exc_info:
         app.main()
 
-    # Validate that it exits with code 1 due to invalid URLs
-    assert exc_info.value.code == 1
+    # Validate that it exits with code 0 when models are successfully processed
+    # (DATASET/CODE URLs are filtered but not errors)
+    assert exc_info.value.code == 0
 
     # Validate NDJSON output format and content filtering
     out = capsys.readouterr().out.strip().splitlines()

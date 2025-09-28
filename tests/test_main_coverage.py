@@ -51,34 +51,24 @@ def test_write_error_line_function(tmp_path):
 
 
 def test_main_with_error_file(tmp_path, monkeypatch, capsys):
-    """Test main function with error file logging."""
+    """Test main function with error file logging when model processing fails."""
     p = tmp_path / "urls.txt"
     p.write_text("https://huggingface.co/gpt2\nhttps://huggingface.co/datasets/squad\n")
 
     error_file = tmp_path / "errors.jsonl"
 
-    # Test with error file
+    # Mock process_model to simulate failure instead of mocking ProcessPoolExecutor
+    def failing_process_model(url):
+        raise ModelLookupError("test-model", 404, "Not Found")
+
+    # Test with error file and failing model processing
     monkeypatch.setattr(sys, "argv", ["prog", str(p), "--error-file", str(error_file)])
-    monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
-
-    # Mock ProcessPoolExecutor to simulate failure scenario
-    class DummyPool:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            pass
-
-        def submit(self, func, url):
-            future = Mock()
-            future.result.side_effect = ModelLookupError("test-model", 404, "Not Found")
-            return future
-
-    monkeypatch.setattr(app.cf, "ProcessPoolExecutor", lambda: DummyPool())
+    monkeypatch.setattr(app, "process_model", failing_process_model)
 
     with pytest.raises(SystemExit) as exc_info:
         app.main()
 
+    # Should exit with 1 due to model processing failure (not due to dataset URL filtering)
     assert exc_info.value.code == 1
 
     # Verify error file was created with classification errors

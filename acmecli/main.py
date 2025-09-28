@@ -166,19 +166,29 @@ def main() -> None:
         print(f"📊 Summary report: {summary_file}", flush=True)
         print(f"🔍 View summary: cat {summary_file}", flush=True)
 
-    # Final reporting
+    # Final reporting - only report actual errors, not category filtering
     if invalid:
-        print("[error] invalid/unsupported URL(s) detected:", file=sys.stderr)
-        for u, why in invalid:
-            print(f"  - {u}: {why}", file=sys.stderr)
+        # Filter out expected non-model categories (DATASET, CODE) from error reporting
+        actual_errors = [
+            (u, why)
+            for u, why in invalid
+            if not ("unsupported category:" in why and ("DATASET" in why or "CODE" in why))
+        ]
+        if actual_errors:
+            print("[error] invalid/unsupported URL(s) detected:", file=sys.stderr)
+            for u, why in actual_errors:
+                print(f"  - {u}: {why}", file=sys.stderr)
+        # Update invalid list to only include actual errors for exit code logic
+        invalid = actual_errors
+
     if failures:
         print("[error] model failures:", file=sys.stderr)
         for u, why in failures:
             print(f"  - {u}: {why}", file=sys.stderr)
 
     # Exit policy:
-    #   0 -> all OK
-    #   1 -> any problem (usage/config, invalid classification, lookup/processing)
+    #   0 -> all OK (including successful processing of models even with DATASET/CODE URLs present)
+    #   1 -> any actual problem (usage/config, actual invalid URLs, lookup/processing failures)
     raise SystemExit(1 if (invalid or failures) else 0)
 
 
