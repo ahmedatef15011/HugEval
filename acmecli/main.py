@@ -1,5 +1,5 @@
 """
-ACME Model Scoring CLI - Main Application Entry Point
+CLI entry point for evaluating Hugging Face models and emitting scores.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def _write_error_line(path: str, record: Dict[str, Any]) -> None:
 
 
 def _validate_environment() -> None:
-    """Validate environment configuration."""
+    """Validate basic env settings (token, log path)."""
     import requests
 
     # Validate GitHub token if provided

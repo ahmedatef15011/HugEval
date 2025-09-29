@@ -1,17 +1,7 @@
 """
-ACME Model Scoring Engine
+Core scoring orchestration: computes per-metric scores and the final weighted net score.
 
-This module implements the core scoring algorithms for trustworthy machine learning model
-evaluation. It combines multiple quality dimensions into weighted composite scores that
-reflect real-world deployment readiness and reliability.
-
-The scoring system evaluates eight key dimensions: model size efficiency, license compliance,
-documentation quality (ramp-up time), team sustainability (bus factor), dataset availability,
-data quality, code quality, and performance validation. Each metric is carefully weighted
-based on industry best practices for ML model deployment.
-
-All scores are normalized to [0,1] range with automatic latency tracking for performance
-monitoring in production environments.
+All metric scores are clamped to [0,1]. Latencies are tracked for observability.
 """
 
 from __future__ import annotations
@@ -46,29 +36,12 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
 
 
 def clamp01(x: float) -> float:
-    """
-    Normalize score to valid [0,1] range with type safety.
-
-    Essential for maintaining score consistency across different metric scales
-    and ensuring reliable composite score calculations.
-    """
+    """Clamp value to [0,1]."""
     return max(0.0, min(1.0, float(x)))
 
 
 def _device_size_scores(total_bytes: int) -> Dict[str, float]:
-    """
-    Deterministic, device-aware size efficiency mapping based solely on model size.
-
-    Uses a smooth, capacity-based curve per device: score = 1 / (1 + (S/C)^a)
-    - S: model size in bytes
-    - C: device capacity constant (in bytes)
-    - a: sharpness factor controlling how fast the score falls as size grows
-
-    Chosen to yield intuitive behavior without hard-coding any model-specific values:
-    - Small models (< C) score close to 1.0
-    - Models around C are ~0.5
-    - Larger models decay smoothly toward 0.0
-    """
+    """Map model size to device-specific scores via 1/(1+(S/C)^a) curves."""
     S = max(0.0, float(total_bytes))
     # Slightly more forgiving capacities to align with expected device scores
     params = {
@@ -86,21 +59,7 @@ def _device_size_scores(total_bytes: int) -> Dict[str, float]:
 
 
 def compute_all_scores(ctx: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Execute comprehensive model evaluation across all quality dimensions.
-
-    This is the primary scoring orchestrator that coordinates individual metric
-    calculations and combines them into weighted composite scores. Each metric
-    includes latency tracking for performance monitoring and system optimization.
-
-    Args:
-        ctx: Context dictionary containing model metadata, API responses, and
-             repository analysis results from build_context_from_api()
-
-    Returns:
-        Dict containing individual scores, latencies, and composite net_score
-        representing overall model trustworthiness and deployment readiness
-    """
+    """Compute all metrics, merge latencies, and produce the final results dict."""
     t_start = time.perf_counter()
 
     # Repository analysis metrics with performance timing (computation only)

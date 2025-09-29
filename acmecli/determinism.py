@@ -1,17 +1,8 @@
 """
-Determinism utilities
+Deterministic seeding helpers for reproducible runs.
 
-This module centralizes seeding and (best-effort) determinism knobs to reduce run-to-run
-variance. It is safe to import in environments without optional deps (NumPy, Torch).
-
-Usage:
-    from .determinism import set_global_determinism
-    set_global_determinism()  # reads SEED env var or defaults to 0
-
-Environment variables:
-    - SEED: integer seed value (default: 0)
-    - DETERMINISTIC: if set to a truthy value, enables stricter deterministic settings
-                     in optional libraries when available.
+Reads SEED and DETERMINISTIC from the environment and seeds stdlib and
+optional libraries (NumPy, PyTorch) when available.
 """
 
 from __future__ import annotations
@@ -28,9 +19,9 @@ def _truthy(s: Optional[str]) -> bool:
 
 
 def set_global_determinism(seed: Optional[int] = None) -> int:
-    """Set seeds across stdlib and optional libs. Returns the seed used.
+    """Seed stdlib and optional libs; return the seed used.
 
-    Best effort only; if libraries are absent, this is a no-op for them.
+    Best-effort only; silently skips unavailable libraries.
     """
     if seed is None:
         try:

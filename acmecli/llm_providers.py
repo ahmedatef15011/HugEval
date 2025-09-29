@@ -1,21 +1,11 @@
 """
-LLM provider abstraction (Purdue GenAI Studio only).
+LLM provider abstraction (Purdue GenAI only).
 
-Environment variables:
-- LLM_PROVIDER: must be 'purdue' (default: purdue)
-- PURDUE_GENAI_BASE_URL: Base URL for Purdue GenAI Studio REST API
-- PURDUE_GENAI_API_KEY: API key/token for Purdue GenAI Studio
-- PURDUE_GENAI_MODEL: Model identifier/name for Purdue GenAI Studio
+Env:
+- LLM_PROVIDER=purdue
+- PURDUE_GENAI_BASE_URL, PURDUE_GENAI_API_KEY, PURDUE_GENAI_MODEL, PURDUE_GENAI_PATH
 
-Usage:
-    from .llm_providers import get_llm_provider
-    provider = get_llm_provider()
-    result = provider.analyze_readme(model_name, readme_text)
-
-Contract: analyze_readme returns dict with keys
-- documentation_quality: float [0,1]
-- ease_of_use: float [0,1]
-- examples_present: bool
+Contract: analyze_readme(model, readme) -> {documentation_quality, ease_of_use, examples_present}
 """
 
 from __future__ import annotations
@@ -47,14 +37,7 @@ class PurdueGenAIProvider(LLMProvider):
         self.path = path if path.startswith("/") else f"/{path}"
 
     def analyze_readme(self, model_name: str, readme: str) -> Dict[str, Any]:
-        """Call Purdue GenAI Studio REST API.
-
-            Assumed endpoint (example): POST {base_url}/v1/chat/completions
-            Headers: Authorization: Bearer <API_KEY>, Content-Type: application/json
-        Body: { model, messages: [{role:"user", content: prompt}], temperature: 0.0,
-        max_tokens: 150 }
-            Adjust as needed for the actual Purdue API.
-        """
+        """Call Purdue GenAI REST API (OpenAI-compatible chat endpoint)."""
         prompt = (
             f"Analyze README for model '{model_name}'. Return JSON with keys: "
             "documentation_quality, ease_of_use, examples_present (bool).\n\n"

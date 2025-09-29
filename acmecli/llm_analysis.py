@@ -1,18 +1,6 @@
 """
-LLM-Enhanced Model Documentation Analysis System
-
-This module implements sophisticated natural language processing capabilities for analyzing
-machine learning model documentation quality using Large Language Models. The system
-provides both OpenAI API integration and intelligent local fallback analysis to ensure
-robust operation across different deployment environments.
-
-The LLM integration specifically enhances the ramp_up_time metric by analyzing README
-content for documentation quality, ease of use indicators, and practical examples.
-This approach provides more nuanced assessment than traditional keyword-based analysis,
-particularly valuable for evaluating model trustworthiness and developer experience.
-
-Key capabilities include real-time README analysis, quality scoring enhancement,
-and seamless fallback to local analysis when API access is unavailable.
+LLM-assisted README analysis with deterministic local fallback.
+Enhances documentation-related signals used in ramp_up_time.
 """
 
 from __future__ import annotations
@@ -27,25 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def analyze_readme_with_llm(readme_content: str, model_name: str) -> Dict[str, Any]:
-    """
-    Orchestrate comprehensive README analysis using LLM capabilities with intelligent fallback.
-
-    This is the primary entry point for LLM-enhanced documentation analysis. The system
-    attempts to use OpenAI's GPT models for sophisticated natural language understanding
-    of documentation quality, falling back to robust local analysis when needed.
-
-    The analysis focuses on key factors that impact developer experience: documentation
-    completeness, clarity of setup instructions, presence of working examples, and
-    overall ease of adoption for new users.
-
-    Args:
-        readme_content: Raw README markdown content from model repository
-        model_name: Model identifier for logging and analysis context
-
-    Returns:
-        Dict containing documentation quality metrics, ease of use scores,
-        and boolean indicators for key documentation elements
-    """
+    """Analyze README via provider; fall back to local heuristics if unavailable."""
     # Use configured provider (Purdue). If none configured or it fails,
     # fall back to deterministic local analysis unless LLM_STRICT is enabled.
     provider = get_llm_provider()
@@ -76,24 +46,7 @@ def analyze_readme_with_llm(readme_content: str, model_name: str) -> Dict[str, A
 
 
 def _analyze_readme_locally(readme_content: str, model_name: str) -> Dict[str, Any]:
-    """
-    Comprehensive local README analysis using advanced pattern recognition and heuristics.
-
-    This fallback system provides reliable documentation quality assessment without
-    external dependencies. Uses sophisticated text analysis to identify key documentation
-    elements, code examples, and structural quality indicators that correlate with
-    good developer experience.
-
-    The local analysis serves as both a fallback mechanism and a baseline for
-    LLM enhancement comparison, ensuring consistent operation across environments.
-
-    Args:
-        readme_content: Documentation content to analyze
-        model_name: Model identifier for contextual logging
-
-    Returns:
-        Dict containing quality scores and feature detection results
-    """
+    """Local heuristic README analysis: install/usage/api/examples and code-block density."""
     if not readme_content:
         return {
             "documentation_quality": 0.0,
@@ -143,30 +96,12 @@ def _analyze_readme_locally(readme_content: str, model_name: str) -> Dict[str, A
 
 
 def _call_openai_api(readme_content: str, model_name: str) -> Dict[str, Any]:
-    """Shim kept for test compatibility; now always uses local analysis."""
+    """Compatibility shim; always uses local analysis."""
     return _analyze_readme_locally(readme_content, model_name)
 
 
 def enhance_ramp_up_time_with_llm(base_score: float, readme_content: str, model_name: str) -> float:
-    """
-    Enhance ramp_up_time metric using sophisticated LLM-powered documentation analysis.
-
-    This function represents the core LLM integration requirement, demonstrating how
-    advanced language models can significantly improve metric accuracy by understanding
-    nuanced aspects of documentation quality that traditional analysis cannot capture.
-
-    The enhancement algorithm combines traditional scoring with LLM insights using
-    carefully tuned weights that balance established heuristics with AI-powered analysis.
-    This hybrid approach provides more reliable assessment while maintaining consistency.
-
-    Args:
-        base_score: Original ramp_up_time score from traditional analysis
-        readme_content: Documentation content for LLM analysis
-        model_name: Model identifier for contextual enhancement
-
-    Returns:
-        float: Enhanced score combining traditional metrics with LLM insights [0.0, 1.0]
-    """
+    """Blend base ramp-up score with LLM-derived doc signals (70/30)."""
     try:
         # Execute comprehensive LLM analysis of documentation quality
         analysis = analyze_readme_with_llm(readme_content, model_name)

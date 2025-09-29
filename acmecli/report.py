@@ -1,17 +1,5 @@
 """
-Executive Business Reporting System for ML Model Evaluation Results
-
-This module transforms technical model evaluation data into executive-friendly business
-reports that enable strategic decision-making. The reporting system bridges the gap
-between technical metrics and business value, providing clear recommendations for
-model adoption, risk assessment, and deployment planning.
-
-The system generates comprehensive summaries with risk categorization, compliance
-analysis, and actionable insights that support both technical teams and business
-stakeholders in making informed decisions about ML model integration.
-
-Key capabilities include comparative analysis, trend identification, compliance
-reporting, and strategic recommendations based on comprehensive quality assessment.
+Summary report generation for evaluated models (text output and helpers).
 """
 
 from __future__ import annotations
@@ -23,24 +11,7 @@ from typing import Any, Dict, List, Optional
 
 
 def parse_model_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    Transform raw evaluation results into structured business intelligence data.
-
-    This function serves as the primary data processing pipeline that converts
-    technical scoring results into business-relevant insights. Performs statistical
-    analysis, risk categorization, and trend identification to support strategic
-    decision-making processes.
-
-    The analysis includes performance ranking, quality distribution assessment,
-    and risk-based categorization that enables executives to quickly identify
-    deployment-ready models and understand overall portfolio quality.
-
-    Args:
-        results: List of model evaluation results with scores and metadata
-
-    Returns:
-        Dict containing structured analysis with rankings, statistics, and categories
-    """
+    """Aggregate and rank results; compute simple stats and categories."""
     if not results:
         return {"total_models": 0, "models": []}
 
@@ -100,19 +71,7 @@ def parse_model_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def extract_model_name(url: str) -> str:
-    """
-    Extract human-readable model identifier from repository URL for business reporting.
-
-    Transforms technical URLs into clean, presentation-ready model names suitable
-    for executive reports and business documentation. Essential for creating
-    professional reports that communicate clearly with non-technical stakeholders.
-
-    Args:
-        url: Full repository URL from evaluation results
-
-    Returns:
-        str: Clean model name suitable for business presentation
-    """
+    """Extract model id from a Hugging Face URL."""
     if "huggingface.co/" in url:
         # Clean up common URL patterns and extract model name
         clean_url = url.rstrip("/")
@@ -124,19 +83,7 @@ def extract_model_name(url: str) -> str:
 
 
 def format_score(score: float) -> str:
-    """
-    Transform numerical scores into executive-friendly ratings with business context.
-
-    Converts technical scores into intuitive percentage ratings with qualitative
-    assessments that enable quick decision-making. The rating system aligns with
-    business risk tolerance and deployment readiness criteria.
-
-    Args:
-        score: Numerical score from evaluation system [0.0, 1.0]
-
-    Returns:
-        str: Formatted percentage with qualitative business rating
-    """
+    """Format score as percentage with a simple label."""
     percentage = score * 100
     if percentage >= 80:
         return f"{percentage:.1f}% (Excellent)"
@@ -151,25 +98,7 @@ def format_score(score: float) -> str:
 def generate_summary_report(
     results: List[Dict[str, Any]], output_file: str = "model_evaluation_summary.txt"
 ) -> str:
-    """
-    Generate comprehensive executive summary report for strategic decision-making.
-
-    Creates professional business reports that transform technical evaluation data
-    into actionable insights for executives, product managers, and technical leaders.
-    The report includes executive summary, risk assessment, deployment recommendations,
-    and detailed analysis suitable for board presentations and strategic planning.
-
-    The report structure follows enterprise reporting standards with clear sections
-    for different stakeholder needs: executive overview, technical details, risk
-    analysis, and implementation recommendations.
-
-    Args:
-        results: Model evaluation results from the assessment pipeline
-        output_file: Output filename for the generated report
-
-    Returns:
-        str: Path to the generated summary report file
-    """
+    """Create a human-readable summary report and write it to a file."""
 
     analysis = parse_model_results(results)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -333,7 +262,7 @@ def generate_summary_report(
 
 
 def load_ndjson_results(file_path: str) -> List[Dict[str, Any]]:
-    """Load results from NDJSON file."""
+    """Load results from an NDJSON file into a list of dicts."""
     results = []
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -350,7 +279,7 @@ def load_ndjson_results(file_path: str) -> List[Dict[str, Any]]:
 
 
 def generate_summary_from_file(ndjson_file: str, summary_file: Optional[str] = None) -> str:
-    """Generate summary report from existing NDJSON file."""
+    """Generate a summary from an existing NDJSON file."""
     if summary_file is None:
         base_name = Path(ndjson_file).stem
         summary_file = f"{base_name}_summary.txt"
@@ -362,7 +291,7 @@ def generate_summary_from_file(ndjson_file: str, summary_file: Optional[str] = N
 def capture_and_summarize_results(
     results: List[Dict[str, Any]], base_filename: str = "evaluation"
 ) -> tuple[str, str]:
-    """Capture results and generate both NDJSON and summary files."""
+    """Write NDJSON and summary files; return their paths."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Save NDJSON results
